@@ -559,11 +559,11 @@ impl<E: Endpoint<PathHandle = PathHandle>> Instance<E> {
 
             let timeout = endpoint.timeout();
 
+            let timestamp = clock.get_time();
             if let Some(timeout) = timeout {
-                timer.update(timeout);
+                timer.update(timeout, timestamp);
             }
 
-            let timestamp = clock.get_time();
             let subscriber = endpoint.subscriber();
             let mut publisher = event::EndpointPublisherSubscriber::new(
                 event::builder::EndpointMeta {
