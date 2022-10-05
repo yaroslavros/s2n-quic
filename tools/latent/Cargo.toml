@@ -1,0 +1,28 @@
+[package]
+name = "latent"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+bytes = "1"
+hdrhistogram = "7"
+mimalloc = { version = "0.1", default-features = false }
+openssl-sys = { version = "0.9", features = ["vendored"] }
+rustls-pemfile = "1"
+s2n-quic = { version = "1", features = ["provider-event-tracing"], path = "../../quic/s2n-quic" }
+s2n-quic-core = { version = "0.11", default-features = false, path = "../../quic/s2n-quic-core" }
+s2n-tls = "0.0.14"
+s2n-tls-tokio = "0.0.14"
+structopt = "0.3"
+tokio = { version = "1", features = ["full"] }
+tokio-rustls = "0.23"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+#debug = true
+lto = true
+codegen-units = 1
+
+[workspace]
+members = ["."]
