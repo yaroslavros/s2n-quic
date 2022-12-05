@@ -1,0 +1,14 @@
+[package]
+name = "s2n-quic-system"
+version = "0.0.0"
+edition = "2021"
+publish = false # this is still experimental
+
+[dependencies]
+s2n-codec = { path = "../../common/s2n-codec" }
+s2n-quic-core = { path = "../s2n-quic-core" }
+s2n-quic-transport = { path = "../s2n-quic-transport" }
+specs = { version = "0.18", features = ["derive"] }
+
+[dev-dependencies]
+bolero = "0.8"

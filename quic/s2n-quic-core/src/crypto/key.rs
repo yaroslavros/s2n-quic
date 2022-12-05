@@ -4,7 +4,7 @@
 use crate::crypto::CryptoError;
 
 /// A trait for crypto keys
-pub trait Key: Send {
+pub trait Key: Send + Sync {
     /// Decrypt a payload
     fn decrypt(
         &self,
