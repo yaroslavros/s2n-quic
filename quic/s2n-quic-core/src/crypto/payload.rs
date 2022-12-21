@@ -68,6 +68,10 @@ impl<'a> ProtectedPayload<'a> {
     pub fn is_empty(&self) -> bool {
         self.buffer.is_empty()
     }
+
+    pub fn into_less_safe_payload(self) -> (usize, &'a mut [u8]) {
+        (self.header_len, self.buffer.into_less_safe_slice())
+    }
 }
 
 /// Type which restricts access to encrypted payloads

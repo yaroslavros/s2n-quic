@@ -72,6 +72,23 @@ pub type EncryptedInitial<'a> =
 pub type CleartextInitial<'a> =
     Initial<&'a [u8], &'a [u8], &'a [u8], PacketNumber, DecoderBufferMut<'a>>;
 
+impl<DCID, SCID, Token, PacketNumber, Payload> Initial<DCID, SCID, Token, PacketNumber, Payload> {
+    #[inline]
+    pub fn map_payload<F: FnOnce(Payload) -> Out, Out>(
+        self,
+        f: F,
+    ) -> Initial<DCID, SCID, Token, PacketNumber, Out> {
+        Initial {
+            version: self.version,
+            destination_connection_id: self.destination_connection_id,
+            source_connection_id: self.source_connection_id,
+            token: self.token,
+            packet_number: self.packet_number,
+            payload: f(self.payload),
+        }
+    }
+}
+
 impl<'a> ProtectedInitial<'a> {
     #[inline]
     pub(crate) fn decode(

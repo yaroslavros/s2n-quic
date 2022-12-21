@@ -61,6 +61,22 @@ pub type EncryptedHandshake<'a> =
     Handshake<CheckedRange, CheckedRange, PacketNumber, EncryptedPayload<'a>>;
 pub type CleartextHandshake<'a> = Handshake<&'a [u8], &'a [u8], PacketNumber, DecoderBufferMut<'a>>;
 
+impl<DCID, SCID, PacketNumber, Payload> Handshake<DCID, SCID, PacketNumber, Payload> {
+    #[inline]
+    pub fn map_payload<F: FnOnce(Payload) -> Out, Out>(
+        self,
+        f: F,
+    ) -> Handshake<DCID, SCID, PacketNumber, Out> {
+        Handshake {
+            version: self.version,
+            destination_connection_id: self.destination_connection_id,
+            source_connection_id: self.source_connection_id,
+            packet_number: self.packet_number,
+            payload: f(self.payload),
+        }
+    }
+}
+
 impl<'a> ProtectedHandshake<'a> {
     #[inline]
     pub(crate) fn decode(
