@@ -1,0 +1,16 @@
+[package]
+name = "handshake-fuzzer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+s2n-quic = { path = "../../quic/s2n-quic", features = ["provider-event-tracing"] }
+s2n-quic-core = { path = "../../quic/s2n-quic-core", features = ["testing"] }
+tokio = { version = "1", features = ["full"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rand = "0.8"
+
+[workspace]
+members = ["."]

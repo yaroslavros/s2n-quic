@@ -1,0 +1,2 @@
+server: ./target/release/handshake-fuzzer server
+client: ./target/release/handshake-fuzzer client
