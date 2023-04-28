@@ -21,6 +21,8 @@ use s2n_quic_core::{
 #[cfg(any(test, feature = "generator"))]
 use bolero_generator::*;
 
+pub mod owned;
+
 #[repr(transparent)]
 pub struct Message(pub(crate) msghdr);
 
@@ -124,7 +126,7 @@ impl path::Handle for Handle {
     }
 }
 
-impl_message_delegate!(Message, 0, msghdr);
+impl_message_delegate!(Message, msghdr, 0);
 
 impl fmt::Debug for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

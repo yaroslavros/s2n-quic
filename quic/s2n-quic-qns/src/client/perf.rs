@@ -47,11 +47,26 @@ pub struct Perf {
     /// Logs statistics for the endpoint
     #[structopt(long)]
     stats: bool,
+
+    #[cfg(feature = "xdp")]
+    #[structopt(flatten)]
+    xdp: crate::xdp::Xdp,
+
+    #[cfg(feature = "xdp")]
+    #[structopt(long, default_value = "10")]
+    wait_secs: u64,
 }
 
 impl Perf {
     pub async fn run(&self) -> Result<()> {
         let mut client = self.client()?;
+
+        #[cfg(feature = "xdp")]
+        {
+            let wait = self.wait_secs;
+            eprintln!("waiting {wait} seconds for the XDP sockets to be registered");
+            tokio::time::sleep(core::time::Duration::from_secs(wait)).await;
+        }
 
         let mut requests = vec![];
 
@@ -102,7 +117,13 @@ impl Perf {
         }
     }
 
-    fn client(&self) -> Result<Client> {
+    #[cfg(feature = "xdp")]
+    fn io(&self) -> Result<impl io::Provider> {
+        self.xdp.client(self.port)
+    }
+
+    #[cfg(not(feature = "xdp"))]
+    fn io(&self) -> Result<impl io::Provider> {
         let mut io_builder =
             io::Default::builder().with_receive_address((self.local_ip, 0u16).into())?;
 
@@ -110,7 +131,11 @@ impl Perf {
             io_builder = io_builder.with_gso_disabled()?;
         }
 
-        let io = io_builder.build()?;
+        Ok(io_builder.build()?)
+    }
+
+    fn client(&self) -> Result<Client> {
+        let io = self.io()?;
 
         let tls = s2n_quic::provider::tls::default::Client::builder()
             .with_certificate(tls::default::ca(self.ca.as_ref())?)?

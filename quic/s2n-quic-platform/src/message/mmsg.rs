@@ -19,7 +19,7 @@ pub struct Message(pub(crate) mmsghdr);
 
 pub type Handle = msg::Handle;
 
-impl_message_delegate!(Message, 0, mmsghdr);
+impl_message_delegate!(Message, mmsghdr, 0);
 
 impl fmt::Debug for Message {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

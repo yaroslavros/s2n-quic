@@ -43,6 +43,10 @@ pub struct Perf {
     /// Logs statistics for the endpoint
     #[structopt(long)]
     stats: bool,
+
+    #[cfg(feature = "xdp")]
+    #[structopt(flatten)]
+    xdp: crate::xdp::Xdp,
 }
 
 impl Perf {
@@ -165,7 +169,13 @@ impl Perf {
         }
     }
 
-    fn server(&self) -> Result<Server> {
+    #[cfg(feature = "xdp")]
+    fn io(&self) -> Result<impl io::Provider> {
+        self.xdp.server(self.port)
+    }
+
+    #[cfg(not(feature = "xdp"))]
+    fn io(&self) -> Result<impl io::Provider> {
         let mut io_builder =
             io::Default::builder().with_receive_address((self.ip, self.port).into())?;
 
@@ -173,7 +183,11 @@ impl Perf {
             io_builder = io_builder.with_gso_disabled()?;
         }
 
-        let io = io_builder.build()?;
+        Ok(io_builder.build()?)
+    }
+
+    fn server(&self) -> Result<Server> {
+        let io = self.io()?;
 
         let tls = s2n_quic::provider::tls::default::Server::builder()
             .with_certificate(
