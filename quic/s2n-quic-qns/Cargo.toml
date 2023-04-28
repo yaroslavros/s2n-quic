@@ -10,8 +10,11 @@ publish = false
 
 [features]
 default = []
+xdp = ["s2n-quic/unstable-provider-io-xdp", "aya", "aya-log"]
 
 [dependencies]
+aya = { git = "https://github.com/Tuetuopay/aya", branch = "xdpmaps", optional = true }
+aya-log = { git = "https://github.com/Tuetuopay/aya", branch = "xdpmaps", optional = true }
 bytes = { version = "1", default-features = false }
 cfg-if = "1"
 futures = "0.3"

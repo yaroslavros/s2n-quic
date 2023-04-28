@@ -1,2 +1,6 @@
 [workspace]
 members = ["s2n-quic-xdp", "tester", "xtask"]
+
+[patch.crates-io]
+aya = { git = "https://github.com/Tuetuopay/aya", branch = "xdpmaps" }
+aya-log = { git = "https://github.com/Tuetuopay/aya", branch = "xdpmaps" }

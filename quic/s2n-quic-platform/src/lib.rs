@@ -16,5 +16,6 @@ pub mod features;
 pub mod io;
 pub mod message;
 pub mod socket;
+pub mod socket_v2;
 mod syscall;
 pub mod time;

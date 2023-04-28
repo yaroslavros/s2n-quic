@@ -12,6 +12,8 @@ mod interop;
 mod perf;
 mod server;
 mod tls;
+#[cfg(feature = "xdp")]
+mod xdp;
 
 /// This message is searched in interop logs to ensure the application doesn't panic
 ///
@@ -22,7 +24,8 @@ const CRASH_ERROR_MESSAGE: &str = "The s2n-quic-qns application shut down unexpe
 #[global_allocator]
 static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-#[tokio::main()]
+// #[tokio::main(flavor = "current_thread")]
+#[tokio::main]
 async fn main() {
     let format = tracing_subscriber::fmt::format()
         .with_level(false) // don't include levels in formatted output

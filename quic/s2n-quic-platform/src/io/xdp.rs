@@ -20,6 +20,7 @@ pub mod encoder {
 
 // export socket types and helpers
 pub mod socket {
+    pub use crate::socket_v2::*;
     pub use s2n_quic_xdp::socket::*;
 
     /// Binds a UDP socket to a particular interface and socket address
