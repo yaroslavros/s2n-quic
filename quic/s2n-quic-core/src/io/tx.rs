@@ -7,6 +7,14 @@ use core::{
     time::Duration,
 };
 
+pub mod handle_map;
+pub mod router;
+pub mod with_driver;
+
+pub use handle_map::WithHandleMap;
+pub use router::WithRouter;
+pub use with_driver::WithDriver;
+
 pub trait Tx: Sized {
     type PathHandle;
     // TODO make this generic over lifetime
@@ -32,6 +40,51 @@ pub trait Tx: Sized {
 
 impl_ready_future!(Tx, TxReady, Result<(), T::Error>);
 
+pub trait TxExt: Tx {
+    #[inline]
+    fn with_driver<D>(self, driver: D) -> WithDriver<D, Self>
+    where
+        D: with_driver::Driver,
+    {
+        WithDriver {
+            driver,
+            inner: self,
+            has_capacity: true,
+        }
+    }
+
+    #[inline]
+    fn with_router<Router, Other>(
+        self,
+        router: Router,
+        other: Other,
+    ) -> WithRouter<Router, Self, Other>
+    where
+        Router: router::Router,
+        Other: Tx,
+    {
+        WithRouter {
+            router,
+            a: self,
+            b: other,
+        }
+    }
+
+    #[inline]
+    fn with_handle_map<Map, Handle>(self, map: Map) -> WithHandleMap<Map, Self, Handle>
+    where
+        Map: Fn(&Handle) -> Self::PathHandle,
+    {
+        WithHandleMap {
+            map,
+            tx: self,
+            handle: Default::default(),
+        }
+    }
+}
+
+impl<T: Tx> TxExt for T {}
+
 /// A structure capable of queueing and transmitting messages
 pub trait Queue {
     type Handle: path::Handle;
@@ -55,6 +108,7 @@ pub trait Queue {
     fn capacity(&self) -> usize;
 
     /// Returns `true` if the queue will accept additional transmissions
+    #[inline]
     fn has_capacity(&self) -> bool {
         self.capacity() != 0
     }
