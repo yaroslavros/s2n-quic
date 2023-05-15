@@ -13,12 +13,14 @@ struct InnerPacket {
 
 #[cfg(feature = "std")]
 impl super::task::TxSocket<Packet> for std::net::UdpSocket {
+    type State = ();
     type Error = std::io::Error;
 
     #[inline]
     fn poll_send(
         &mut self,
         cx: &mut Context,
+        _state: &mut Self::State,
         (a, b): (&mut [Packet], &mut [Packet]),
     ) -> Poll<Result<usize, Self::Error>> {
         let mut sent = 0;
@@ -63,12 +65,14 @@ impl super::task::TxSocket<Packet> for std::net::UdpSocket {
 
 #[cfg(feature = "tokio")]
 impl super::task::TxSocket<Packet> for tokio::net::UdpSocket {
+    type State = ();
     type Error = std::io::Error;
 
     #[inline]
     fn poll_send(
         &mut self,
         cx: &mut Context,
+        _state: &mut Self::State,
         (a, b): (&mut [Packet], &mut [Packet]),
     ) -> Poll<Result<usize, Self::Error>> {
         let mut sent = 0;

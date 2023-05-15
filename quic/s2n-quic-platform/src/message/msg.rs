@@ -26,6 +26,20 @@ pub mod owned;
 #[repr(transparent)]
 pub struct Message(pub(crate) msghdr);
 
+impl Default for Message {
+    #[inline]
+    fn default() -> Self {
+        Self(unsafe { core::mem::zeroed() })
+    }
+}
+
+impl AsMut<msghdr> for Message {
+    #[inline]
+    fn as_mut(&mut self) -> &mut msghdr {
+        &mut self.0
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "generator"), derive(TypeGenerator))]
 pub struct Handle {

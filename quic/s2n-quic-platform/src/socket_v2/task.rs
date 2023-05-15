@@ -10,11 +10,13 @@ use core::{
 use s2n_quic_core::{event, io::tx, sync::spsc};
 
 pub trait TxSocket<Packet>: Unpin {
+    type State: Unpin;
     type Error;
 
     fn poll_send(
         &mut self,
         cx: &mut Context,
+        state: &mut Self::State,
         packets: (&mut [Packet], &mut [Packet]),
     ) -> Poll<Result<usize, Self::Error>>;
 }
@@ -22,6 +24,7 @@ pub trait TxSocket<Packet>: Unpin {
 pub struct TxFlush<Packet, Socket: TxSocket<Packet>> {
     occupied: spsc::Receiver<Packet>,
     socket: Socket,
+    state: Socket::State,
     free: spsc::Sender<Packet>,
 }
 
@@ -29,11 +32,13 @@ impl<Packet, Socket: TxSocket<Packet>> TxFlush<Packet, Socket> {
     pub fn new(
         occupied: spsc::Receiver<Packet>,
         socket: Socket,
+        state: Socket::State,
         free: spsc::Sender<Packet>,
     ) -> Self {
         Self {
             occupied,
             socket,
+            state,
             free,
         }
     }
@@ -68,7 +73,7 @@ where
 
             debug_assert!(occupied.len() <= free.capacity());
 
-            match this.socket.poll_send(cx, occupied.peek()) {
+            match this.socket.poll_send(cx, &mut this.state, occupied.peek()) {
                 Poll::Ready(Ok(mut count)) => {
                     while count > 0 {
                         if let Some(packet) = occupied.pop() {

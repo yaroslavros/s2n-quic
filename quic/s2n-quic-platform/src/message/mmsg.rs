@@ -14,8 +14,31 @@ use s2n_quic_core::{
     path,
 };
 
+pub mod owned;
+
 #[repr(transparent)]
 pub struct Message(pub(crate) mmsghdr);
+
+impl Default for Message {
+    #[inline]
+    fn default() -> Self {
+        Self(unsafe { core::mem::zeroed() })
+    }
+}
+
+impl AsMut<libc::msghdr> for Message {
+    #[inline]
+    fn as_mut(&mut self) -> &mut libc::msghdr {
+        &mut self.0.msg_hdr
+    }
+}
+
+impl AsMut<mmsghdr> for Message {
+    #[inline]
+    fn as_mut(&mut self) -> &mut mmsghdr {
+        &mut self.0
+    }
+}
 
 pub type Handle = msg::Handle;
 

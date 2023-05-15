@@ -6,8 +6,21 @@
                                                                 // warnings from those
 
 use cfg_if::cfg_if;
+use core::ops::ControlFlow;
 use socket2::{Domain, Protocol, Socket, Type};
 use std::io;
+
+#[cfg(s2n_quic_platform_socket_msg)]
+pub mod msg;
+
+#[cfg(s2n_quic_platform_socket_mmsg)]
+pub mod mmsg;
+
+pub trait SocketEvents {
+    fn on_complete(&mut self, count: usize) -> ControlFlow<(), ()>;
+
+    fn on_error(&mut self, error: ::std::io::Error) -> ControlFlow<(), ()>;
+}
 
 pub fn udp_socket(addr: std::net::SocketAddr) -> io::Result<Socket> {
     let domain = Domain::for_address(addr);

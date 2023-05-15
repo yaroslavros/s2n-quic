@@ -2,6 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use cfg_if::cfg_if;
+use core::ops::ControlFlow;
+
+pub trait EventHandler {
+    fn on_complete(&mut self, count: usize) -> ControlFlow<(), ()>;
+
+    fn on_error(&mut self, error: ::std::io::Error) -> ControlFlow<(), ()>;
+}
 
 pub mod task;
 
