@@ -11,6 +11,8 @@ use s2n_quic_core::{
     xdp::{encoder, path},
 };
 
+pub use tx::TxExt;
+
 pub struct Channel {
     pub tx: ring::Tx,
     pub tx_waker: atomic_waker::Handle,
