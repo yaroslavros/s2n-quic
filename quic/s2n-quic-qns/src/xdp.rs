@@ -42,6 +42,9 @@ pub struct Xdp {
     xdp_mode: XdpMode,
 
     #[structopt(long)]
+    queues: Option<Vec<u32>>,
+
+    #[structopt(long)]
     split_queues: bool,
 }
 
@@ -100,7 +103,14 @@ impl Xdp {
         let fill_ring_len = rx_queue_len * 2;
         let completion_ring_len = tx_queue_len;
 
-        let mut max_queues = syscall::max_queues(&self.interface);
+        let (max_queues, queues) = if let Some(queues) = self.queues.as_ref() {
+            let max_queues = queues.len() as u32;
+            (max_queues, queues.clone())
+        } else {
+            let max_queues = syscall::max_queues(&self.interface);
+            let queues = (0..max_queues).collect();
+            (max_queues, queues)
+        };
 
         let umem_size = if self.split_queues {
             if max_queues % 2 == 0 {
@@ -136,7 +146,7 @@ impl Xdp {
         let mut push_rx = true;
         let mut push_tx = false;
 
-        for queue_id in 0..max_queues {
+        for queue_id in queues {
             if self.split_queues {
                 push_rx = !push_rx;
                 push_tx = !push_tx;
