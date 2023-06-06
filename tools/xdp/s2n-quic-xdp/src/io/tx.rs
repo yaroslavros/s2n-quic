@@ -1,52 +1,86 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    if_xdp::{RxTxDescriptor, UmemDescriptor},
-    umem::Umem,
-};
-use core::{
-    cell::UnsafeCell,
-    task::{Context, Poll},
-};
+use crate::{ring, umem::Umem};
+use core::task::{Context, Poll};
 use s2n_codec::{Encoder as _, EncoderBuffer};
 use s2n_quic_core::{
     event,
     io::tx,
-    sync::spsc,
+    sync::atomic_waker,
     xdp::{encoder, path},
 };
 
-pub type Free = spsc::Receiver<UmemDescriptor>;
-pub type Occupied = spsc::Sender<RxTxDescriptor>;
+pub struct Channel {
+    pub tx: ring::Tx,
+    pub tx_waker: atomic_waker::Handle,
+    pub completion: ring::Completion,
+}
+
+impl Channel {
+    #[inline]
+    fn acquire(&mut self, cx: &mut Context) -> Option<bool> {
+        trace!("acquiring channel capacity");
+
+        let was_empty = self.is_empty();
+
+        for i in 0..2 {
+            let count = self.completion.acquire(u32::MAX);
+            let count = self.tx.acquire(count).min(count);
+
+            trace!("acquired {count} entries");
+
+            if count > 0 {
+                return Some(was_empty);
+            }
+
+            if !self.tx_waker.is_open() {
+                return None;
+            }
+
+            if i > 0 {
+                continue;
+            }
+
+            if was_empty {
+                trace!("registering tx_waker");
+                self.tx_waker.register(cx.waker());
+                trace!("waking tx_waker");
+                self.tx_waker.wake();
+            }
+        }
+
+        Some(false)
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.tx.is_empty() || self.completion.is_empty()
+    }
+
+    #[inline]
+    fn wake_tx(&mut self) {
+        trace!("needs wakeup: {}", self.tx.needs_wakeup());
+        if self.tx.needs_wakeup() || self.is_empty() {
+            trace!("tx_waker wake");
+            self.tx_waker.wake();
+        }
+    }
+}
 
 pub struct Tx {
-    channels: UnsafeCell<Vec<(Free, Occupied)>>,
-    /// Store a vec of slices on the struct so we don't have to allocate every time `queue` is
-    /// called. Since this causes the type to be self-referential it does need a bit of unsafe code
-    /// to pull this off.
-    slices: UnsafeCell<
-        Vec<(
-            spsc::RecvSlice<'static, UmemDescriptor>,
-            spsc::SendSlice<'static, RxTxDescriptor>,
-        )>,
-    >,
+    channels: Vec<Channel>,
     umem: Umem,
     encoder: encoder::State,
-    is_full: bool,
 }
 
 impl Tx {
     /// Creates a TX IO interface for an s2n-quic endpoint
-    pub fn new(channels: Vec<(Free, Occupied)>, umem: Umem, encoder: encoder::State) -> Self {
-        let slices = UnsafeCell::new(Vec::with_capacity(channels.len()));
-        let channels = UnsafeCell::new(channels);
+    pub fn new(channels: Vec<Channel>, umem: Umem, encoder: encoder::State) -> Self {
         Self {
             channels,
-            slices,
             umem,
             encoder,
-            is_full: true,
         }
     }
 
@@ -54,59 +88,39 @@ impl Tx {
     ///
     /// This is used for internal tests only.
     #[cfg(test)]
-    pub fn consume(self) -> Vec<(Free, Occupied)> {
-        self.channels.into_inner()
+    pub fn consume(self) -> Vec<Channel> {
+        self.channels
     }
 }
 
 impl tx::Tx for Tx {
     type PathHandle = path::Tuple;
     type Queue = Queue<'static>;
-    type Error = spsc::ClosedError;
+    type Error = ();
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        // If we didn't fill up the queue then we don't need to poll for capacity
-        if !self.is_full {
-            return Poll::Pending;
-        }
-
         // poll both channels to make sure we can make progress in both
         let mut is_any_ready = false;
-        let mut is_all_free_closed = true;
-        let mut is_all_occupied_closed = true;
+        let mut is_all_closed = true;
 
-        for (free, occupied) in self.channels.get_mut() {
-            let mut is_ready = true;
+        for (idx, channel) in self.channels.iter_mut().enumerate() {
+            if let Some(did_become_ready) = channel.acquire(cx) {
+                trace!("channel {idx} became ready: {did_become_ready}");
 
-            macro_rules! ready {
-                ($slice:ident, $closed:ident) => {
-                    match $slice.poll_slice(cx) {
-                        Poll::Ready(Ok(_)) => {
-                            $closed = false;
-                        }
-                        Poll::Ready(Err(_)) => {
-                            // defer returning an error until all slices return one
-                        }
-                        Poll::Pending => {
-                            $closed = false;
-                            is_ready = false
-                        }
-                    }
-                };
+                is_all_closed = false;
+                is_any_ready |= did_become_ready;
+            } else {
+                trace!("channel {idx} closed");
             }
-
-            ready!(occupied, is_all_occupied_closed);
-            ready!(free, is_all_free_closed);
-
-            is_any_ready |= is_ready;
         }
 
-        if is_all_free_closed || is_all_occupied_closed {
-            return Err(spsc::ClosedError).into();
+        if is_all_closed {
+            return Err(()).into();
         }
 
         if is_any_ready {
+            trace!("tx ready");
             Poll::Ready(Ok(()))
         } else {
             Poll::Pending
@@ -132,40 +146,26 @@ impl tx::Tx for Tx {
             core::mem::transmute(self)
         };
 
-        let slices = this.slices.get_mut();
-
         let mut capacity = 0;
 
-        for (free, occupied) in this.channels.get_mut().iter_mut() {
-            let mut free = free.slice();
-            let mut occupied = occupied.slice();
-
-            // try to synchronize the peer's queues
-            let _ = free.sync();
-            let _ = occupied.sync();
-
-            if free.is_empty() || occupied.capacity() == 0 {
-                continue;
-            }
-
-            capacity += free.len().min(occupied.capacity());
-            slices.push((free, occupied));
+        for (idx, channel) in this.channels.iter_mut().enumerate() {
+            let len = channel.tx.acquire(u32::MAX);
+            let len = channel.completion.acquire(len).min(len);
+            trace!("acquired {len} entries for channel {idx}");
+            capacity += len as usize;
         }
 
-        // update our full status
-        this.is_full = slices.is_empty();
-
+        let channels = &mut this.channels;
         let umem = &mut this.umem;
         let encoder = &mut this.encoder;
-        let is_full = &mut this.is_full;
 
         let mut queue = Queue {
-            slices,
-            slice_index: 0,
+            channels,
+            channel_index: 0,
+            channel_needs_wake: false,
             capacity,
             umem,
             encoder,
-            is_full,
         };
         f(&mut queue);
     }
@@ -179,15 +179,12 @@ impl tx::Tx for Tx {
 }
 
 pub struct Queue<'a> {
-    slices: &'a mut Vec<(
-        spsc::RecvSlice<'a, UmemDescriptor>,
-        spsc::SendSlice<'a, RxTxDescriptor>,
-    )>,
-    slice_index: usize,
+    channels: &'a mut Vec<Channel>,
+    channel_index: usize,
+    channel_needs_wake: bool,
     capacity: usize,
     umem: &'a mut Umem,
     encoder: &'a mut encoder::State,
-    is_full: &'a mut bool,
 }
 
 impl<'a> tx::Queue for Queue<'a> {
@@ -203,17 +200,33 @@ impl<'a> tx::Queue for Queue<'a> {
     {
         // if we're at capacity, then return an error
         if self.capacity == 0 {
+            trace!("at capacity");
             return Err(tx::Error::AtCapacity);
         }
 
-        let (free, occupied) = unsafe {
-            // Safety: the slice index should always be in bounds
-            self.slices.get_unchecked_mut(self.slice_index)
+        let channel = loop {
+            let channel = if let Some(channel) = self.channels.get_mut(self.channel_index) {
+                channel
+            } else {
+                return Err(tx::Error::AtCapacity);
+            };
+
+            if !channel.is_empty() {
+                trace!("selecting channel {}", self.channel_index);
+                break channel;
+            }
+
+            if core::mem::take(&mut self.channel_needs_wake) {
+                trace!("waking channel {}", self.channel_index);
+                channel.wake_tx();
+            }
+            self.channel_index += 1;
         };
 
-        // take the first free descriptor, we should have at least one item
-        let (head, _) = free.peek();
-        let descriptor = head[0];
+        let (entries, _) = channel.completion.data();
+        let descriptor = entries[0];
+
+        trace!("using descriptor {descriptor:?}");
 
         let buffer = unsafe {
             // Safety: this descriptor should be unique, assuming the tasks are functioning
@@ -231,25 +244,18 @@ impl<'a> tx::Queue for Queue<'a> {
         let len = buffer.len();
         let descriptor = descriptor.with_len(len as _);
 
-        // push the descriptor on so it can be transmitted
-        let result = occupied.push(descriptor);
+        trace!("packet written to {descriptor:?}");
 
-        debug_assert!(
-            result.is_ok(),
-            "occupied queue should have capacity {result:?}"
-        );
+        // push the descriptor on so it can be transmitted
+        channel.tx.data().0[0] = descriptor;
 
         // make sure we give capacity back to the free queue
-        free.release(1);
-
-        // if this slice is at capacity then increment the index and try the next one
-        if free.is_empty() || occupied.capacity() == 0 {
-            self.slice_index += 1;
-        }
+        channel.tx.release(1);
+        channel.completion.release(1);
+        self.channel_needs_wake = true;
 
         // check to see if we're full now
         self.capacity -= 1;
-        *self.is_full = self.capacity == 0;
 
         // let the caller know how big the payload was
         let outcome = tx::Outcome {
@@ -269,7 +275,11 @@ impl<'a> tx::Queue for Queue<'a> {
 impl<'a> Drop for Queue<'a> {
     #[inline]
     fn drop(&mut self) {
-        // make sure we drop all of the slices to flush our changes
-        self.slices.clear();
+        if self.channel_needs_wake {
+            if let Some(channel) = self.channels.get_mut(self.channel_index) {
+                trace!("waking channel {}", self.channel_index);
+                channel.wake_tx();
+            }
+        }
     }
 }

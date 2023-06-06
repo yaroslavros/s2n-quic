@@ -16,11 +16,19 @@ struct Ring<T: Copy + fmt::Debug> {
     cursor: Cursor<T>,
     flags: NonNull<RingFlags>,
     // make the area clonable in test mode
-    #[cfg(test)]
     area: std::sync::Arc<Mmap>,
-    #[cfg(not(test))]
-    area: Mmap,
     socket: socket::Fd,
+}
+
+impl<T: Copy + fmt::Debug> Clone for Ring<T> {
+    fn clone(&self) -> Self {
+        Self {
+            cursor: self.cursor.clone(),
+            flags: self.flags,
+            area: self.area.clone(),
+            socket: self.socket.clone(),
+        }
+    }
 }
 
 impl<T: Copy + fmt::Debug> Ring<T> {
@@ -102,7 +110,6 @@ macro_rules! impl_producer {
                 (builder.build_producer(), flags)
             };
 
-            #[cfg(test)]
             let area = std::sync::Arc::new(area);
 
             Ok(Self(Ring {
@@ -155,10 +162,32 @@ macro_rules! impl_producer {
             self.0.cursor.capacity() as _
         }
 
+        #[inline]
+        pub fn len(&self) -> u32 {
+            self.0.cursor.cached_producer_len()
+        }
+
+        #[inline]
+        pub fn is_empty(&self) -> bool {
+            self.0.cursor.cached_producer_len() == 0
+        }
+
+        #[inline]
+        pub fn sync(&mut self) {
+            self.0.cursor.acquire_consumer(u32::MAX);
+            self.0.cursor.acquire_producer(u32::MAX);
+        }
+
         /// Returns the socket associated with the ring
         #[inline]
         pub fn socket(&self) -> &socket::Fd {
             &self.0.socket
+        }
+
+        #[inline]
+        #[allow(dead_code)]
+        pub(crate) fn driver_clone(&self) -> Self {
+            Self(self.0.clone())
         }
     };
 }
@@ -186,7 +215,6 @@ macro_rules! impl_consumer {
                 (builder.build_consumer(), flags)
             };
 
-            #[cfg(test)]
             let area = std::sync::Arc::new(area);
 
             Ok(Self(Ring {
@@ -233,10 +261,31 @@ macro_rules! impl_consumer {
             self.0.cursor.capacity() as _
         }
 
+        #[inline]
+        pub fn len(&self) -> u32 {
+            self.0.cursor.cached_producer_len()
+        }
+
+        #[inline]
+        pub fn is_empty(&self) -> bool {
+            self.0.cursor.cached_consumer_len() == 0
+        }
+
         /// Returns the socket associated with the ring
         #[inline]
         pub fn socket(&self) -> &socket::Fd {
             &self.0.socket
+        }
+
+        #[inline]
+        pub fn sync(&mut self) {
+            self.0.cursor.acquire_consumer(u32::MAX);
+            self.0.cursor.acquire_producer(u32::MAX);
+        }
+
+        #[inline]
+        pub(crate) fn driver_clone(&self) -> Self {
+            Self(self.0.clone())
         }
 
         #[cfg(test)]
@@ -260,6 +309,11 @@ pub struct Rx(Ring<RxTxDescriptor>);
 
 impl Rx {
     impl_consumer!(RxTxDescriptor, set_rx_ring_size, rx, RX_RING);
+
+    #[inline]
+    pub(crate) fn producer_index(&self) -> u32 {
+        self.0.cursor.cached_producer()
+    }
 }
 
 /// The fill ring for entries to be populated

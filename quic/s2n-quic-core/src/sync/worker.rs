@@ -26,6 +26,12 @@ pub struct Receiver {
 }
 
 impl Receiver {
+    /// Returns the current number of credits acquired
+    #[inline]
+    pub fn credits(&self) -> usize {
+        self.credits
+    }
+
     /// Acquires work to be processed for the Receiver
     ///
     /// `None` is returned when there are no more active Senders.

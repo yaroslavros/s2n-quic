@@ -70,7 +70,7 @@ impl<T: Copy> Builder<T> {
 /// A structure for tracking a ring shared between a producer and consumer
 ///
 /// See [xsk.h](https://github.com/xdp-project/xdp-tools/blob/a76e7a2b156b8cfe38992206abe9df1df0a29e38/headers/xdp/xsk.h#L34-L42).
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Cursor<T: Copy> {
     /// A cached value for the producer cursor index
     ///
@@ -258,7 +258,7 @@ impl<T: Copy> Cursor<T> {
     ///
     /// See [xsk.h](https://github.com/xdp-project/xdp-tools/blob/a76e7a2b156b8cfe38992206abe9df1df0a29e38/headers/xdp/xsk.h#L114).
     #[inline]
-    pub fn cached_consumer_len(&mut self) -> u32 {
+    pub fn cached_consumer_len(&self) -> u32 {
         (self.cached_producer - self.cached_consumer).0
     }
 

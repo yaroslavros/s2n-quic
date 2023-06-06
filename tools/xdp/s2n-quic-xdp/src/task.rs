@@ -12,15 +12,11 @@
 //! get into a deadlock if things aren't exactly right. As such, each task has a fuzz test that
 //! tries to show the tasks working properly, even in extreme cases.
 
-pub mod completion_to_tx;
 pub mod rx;
-pub mod rx_to_fill;
 pub mod tx;
 
 #[cfg(test)]
 mod testing;
 
-pub use completion_to_tx::completion_to_tx;
 pub use rx::rx;
-pub use rx_to_fill::rx_to_fill;
 pub use tx::tx;
