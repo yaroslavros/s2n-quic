@@ -11,12 +11,13 @@ use s2n_quic::provider::io::{
     xdp::{
         bpf, encoder,
         if_xdp::{self, XdpFlags},
-        io::{self as xdp_io, tx::TxExt},
-        ring, socket, spsc, syscall, task, umem, Provider,
+        io::{self as xdp_io},
+        ring, socket, syscall, umem, Provider,
     },
 };
-use std::{ffi::CString, net::SocketAddr, os::unix::io::AsRawFd};
+use std::{ffi::CString, net::SocketAddr, os::unix::io::AsRawFd, sync::Arc};
 use structopt::StructOpt;
+use tokio::{io::unix::AsyncFd, net::UdpSocket};
 
 #[derive(Debug, StructOpt)]
 pub struct Xdp {
@@ -42,7 +43,7 @@ pub struct Xdp {
     xdp_mode: XdpMode,
 
     #[structopt(long)]
-    split_queues: bool,
+    no_checksum: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -80,16 +81,9 @@ impl From<XdpMode> for programs::xdp::XdpFlags {
 
 type SetupResult = Result<(
     umem::Umem,
-    Vec<(
-        spsc::Receiver<if_xdp::RxTxDescriptor>,
-        spsc::Sender<if_xdp::UmemDescriptor>,
-    )>,
+    Vec<xdp_io::rx::Channel<Arc<AsyncFd<socket::Fd>>>>,
     Vec<(u32, socket::Fd)>,
-    Vec<(
-        spsc::Receiver<if_xdp::UmemDescriptor>,
-        spsc::Sender<if_xdp::RxTxDescriptor>,
-    )>,
-    xdp_io::driver::Driver,
+    Vec<xdp_io::tx::Channel<xdp_io::tx::BusyPoll>>,
 )>;
 
 impl Xdp {
@@ -101,17 +95,7 @@ impl Xdp {
         let completion_ring_len = tx_queue_len;
 
         let max_queues = syscall::max_queues(&self.interface);
-
-        // if split_queues is true, then we assign half to TX and half to RX
-        let umem_size = if self.split_queues {
-            if max_queues % 2 == 0 {
-                (rx_queue_len + tx_queue_len) * (max_queues / 2)
-            } else {
-                (rx_queue_len * (max_queues / 2 + 1)) + (tx_queue_len * (max_queues / 2))
-            }
-        } else {
-            (rx_queue_len + tx_queue_len) * max_queues
-        };
+        let umem_size = (rx_queue_len + tx_queue_len) * max_queues;
 
         // create a UMEM
         let umem = umem::Builder {
@@ -129,27 +113,14 @@ impl Xdp {
         address.set_if_name(&CString::new(self.interface.clone())?)?;
 
         let mut shared_umem_fd = None;
-        let mut tx = vec![];
-        let mut tx_driver = xdp_io::driver::Driver::default();
-        let mut rx = vec![];
+        let mut tx_channels = vec![];
+        let mut rx_channels = vec![];
         let mut rx_fds = vec![];
 
         let mut desc = umem.frames();
 
-        let mut push_rx = true;
-        let mut push_tx = false;
-
         // iterate over all of the queues and create sockets for each one
         for queue_id in 0..max_queues {
-            // if we're splitting the queues alternate between RX/TX
-            if self.split_queues {
-                push_rx = !push_rx;
-                push_tx = !push_tx;
-            } else {
-                push_rx = true;
-                push_tx = true;
-            }
-
             let socket = socket::Fd::open()?;
 
             // if we've already attached a socket to the UMEM, then reuse the first FD
@@ -164,93 +135,53 @@ impl Xdp {
             address.queue_id = queue_id;
 
             // file descriptors can only be added once so wrap it in an Arc
-            let async_fd = std::sync::Arc::new(tokio::io::unix::AsyncFd::new(socket.clone())?);
+            let async_fd = Arc::new(AsyncFd::new(socket.clone())?);
 
             // get the offsets for each of the rings
             let offsets = syscall::offsets(&socket)?;
 
-            if push_rx {
-                let (mut send_fill, recv_fill) = spsc::channel((fill_ring_len * 2) as usize);
-                let (send_occupied, recv_occupied) = spsc::channel((fill_ring_len * 2) as usize);
-
+            {
                 // create a pair of rings for receiving packets
-                let fill_ring = ring::Fill::new(socket.clone(), &offsets, fill_ring_len)?;
-                let rx_ring = ring::Rx::new(socket.clone(), &offsets, rx_queue_len)?;
+                let mut fill = ring::Fill::new(socket.clone(), &offsets, fill_ring_len)?;
+                let rx = ring::Rx::new(socket.clone(), &offsets, rx_queue_len)?;
 
                 // remember the FD so we can add it to the XSK map later
                 rx_fds.push((queue_id, socket.clone()));
 
                 // put descriptors in the Fill queue
-                let mut items = (&mut desc).take(rx_queue_len as _);
-                send_fill
-                    .try_slice()
-                    .unwrap()
-                    .unwrap()
-                    .extend(&mut items)
-                    .unwrap();
+                fill.init((&mut desc).take(rx_queue_len as _));
 
-                // spawn a task to push descriptors to the fill ring
-                tokio::spawn(task::rx_to_fill(vec![recv_fill], fill_ring, ()));
+                rx_channels.push(xdp_io::rx::Channel {
+                    rx,
+                    fill,
+                    driver: async_fd.clone(),
+                });
+            };
 
-                // spawn a task to pull descriptors from the RX ring
-                let fd = async_fd.clone();
-                tokio::spawn(task::rx(fd, rx_ring, send_occupied));
-
-                rx.push((recv_occupied, send_fill));
-            } else {
-                // if we're not registering an RX ring on this queue, we still need to set the
-                // appropriate fill ring size
-                syscall::set_fill_ring_size(&socket, fill_ring_len)?;
-            }
-
-            if push_tx {
-                let (mut send_free, recv_free) = spsc::channel((completion_ring_len * 2) as usize);
-                let (send_occupied, recv_occupied) =
-                    spsc::channel((completion_ring_len * 2) as usize);
-
+            {
                 // create a pair of rings for transmitting packets
-                let completion_ring =
+                let mut completion =
                     ring::Completion::new(socket.clone(), &offsets, completion_ring_len)?;
-                let tx_ring = ring::Tx::new(socket.clone(), &offsets, tx_queue_len)?;
+                let tx = ring::Tx::new(socket.clone(), &offsets, tx_queue_len)?;
 
-                // put descriptors in the free queue
-                let mut items = (&mut desc).take(tx_queue_len as _);
-                send_free
-                    .try_slice()
-                    .unwrap()
-                    .unwrap()
-                    .extend(&mut items)
-                    .unwrap();
+                // put descriptors in the completion queue
+                completion.init((&mut desc).take(tx_queue_len as _));
 
-                // create a task to pull descriptors from the completion queue on demand
-                let comp_to_tx = task::completion_to_tx(
-                    task::completion_to_tx::OnDemand,
-                    completion_ring,
-                    frame_size,
-                    vec![send_free],
-                );
-                // register the task on the TxDriver
-                tx_driver.push(Box::pin(comp_to_tx));
-
-                // spawn a task to flush descriptors to the TX ring
-                let fd = socket.clone();
-                tokio::spawn(task::tx(recv_occupied, tx_ring, fd));
-
-                tx.push((recv_free, send_occupied));
-            } else {
-                // if we're not registering an RX ring on this queue, we still need to set the
-                // appropriate fill ring size
-                syscall::set_completion_ring_size(&socket, completion_ring_len)?;
-            }
+                tx_channels.push(xdp_io::tx::Channel {
+                    tx,
+                    completion,
+                    driver: xdp_io::tx::BusyPoll,
+                });
+            };
 
             // finally bind the socket to the configured address
             syscall::bind(&socket, &mut address)?;
         }
 
         // make sure we've allocated all descriptors from the UMEM to a queue
-        assert!(desc.next().is_none());
+        assert_eq!(desc.count(), 0, "descriptors have been leaked");
 
-        Ok((umem, rx, rx_fds, tx, tx_driver))
+        Ok((umem, rx_channels, rx_fds, tx_channels))
     }
 
     fn bpf_task(&self, port: u16, rx_fds: Vec<(u32, socket::Fd)>) -> Result<()> {
@@ -332,7 +263,10 @@ impl Xdp {
     }
 
     pub fn server(&self, addr: SocketAddr) -> Result<impl io::Provider> {
-        let (umem, rx, rx_fds, tx, tx_driver) = self.setup()?;
+        let socket = std::net::UdpSocket::bind(addr)?;
+        let socket = UdpSocket::from_std(socket)?;
+
+        let (umem, rx, rx_fds, tx) = self.setup()?;
 
         self.bpf_task(addr.port(), rx_fds)?;
 
@@ -340,8 +274,11 @@ impl Xdp {
 
         let io_tx = {
             // use the default encoder configuration
-            let encoder = encoder::Config::default();
-            xdp_io::tx::Tx::new(tx, umem, encoder).with_driver(tx_driver)
+            let mut encoder = encoder::Config::default();
+            if self.no_checksum {
+                encoder.set_checksum(false);
+            }
+            xdp_io::tx::Tx::new(tx, umem, encoder)
         };
 
         let provider = Provider::builder()
@@ -349,6 +286,14 @@ impl Xdp {
             .with_tx(io_tx)
             .with_frame_size(self.frame_size as _)?
             .build();
+
+        tokio::spawn(async move {
+            let mut buffer = vec![0; 1500];
+            loop {
+                let result = socket.recv_from(&mut buffer).await;
+                dbg!(result);
+            }
+        });
 
         Ok(provider)
     }

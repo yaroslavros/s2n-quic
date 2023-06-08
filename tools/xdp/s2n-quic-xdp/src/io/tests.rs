@@ -62,10 +62,14 @@ async fn tx_rx_test() {
 
                     tx_outputs.push(tx::Channel {
                         tx,
-                        tx_waker,
+                        driver: tx_waker,
                         completion,
                     });
-                    rx_inputs.push(rx::Channel { rx, rx_waker, fill });
+                    rx_inputs.push(rx::Channel {
+                        rx,
+                        driver: rx_waker,
+                        fill,
+                    });
                 }
 
                 let send_task = tokio::spawn(send(packets, tx_outputs, umem.clone()));
@@ -114,7 +118,7 @@ impl Message for Packet {
 }
 
 /// Sends `count` packets over the TX queue
-async fn send(count: u32, outputs: Vec<tx::Channel>, umem: Umem) {
+async fn send(count: u32, outputs: Vec<tx::Channel<atomic_waker::Handle>>, umem: Umem) {
     let state = Default::default();
     let mut tx = Tx::new(outputs, umem, state);
 
@@ -151,7 +155,7 @@ async fn send(count: u32, outputs: Vec<tx::Channel>, umem: Umem) {
 }
 
 /// Receives raw packets and converts them into [`Packet`]s, putting them on the `output` channel.
-async fn recv(packets: u32, inputs: Vec<rx::Channel>, umem: Umem) {
+async fn recv(packets: u32, inputs: Vec<rx::Channel<atomic_waker::Handle>>, umem: Umem) {
     let mut rx = Rx::new(inputs, umem);
     let mut actual = s2n_quic_core::interval_set::IntervalSet::default();
 

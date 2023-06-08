@@ -173,21 +173,14 @@ macro_rules! impl_producer {
         }
 
         #[inline]
-        pub fn sync(&mut self) {
-            self.0.cursor.acquire_consumer(u32::MAX);
-            self.0.cursor.acquire_producer(u32::MAX);
+        pub fn is_full(&self) -> bool {
+            self.0.cursor.cached_producer_len() == self.0.cursor.capacity()
         }
 
         /// Returns the socket associated with the ring
         #[inline]
         pub fn socket(&self) -> &socket::Fd {
             &self.0.socket
-        }
-
-        #[inline]
-        #[allow(dead_code)]
-        pub(crate) fn driver_clone(&self) -> Self {
-            Self(self.0.clone())
         }
     };
 }
@@ -263,7 +256,7 @@ macro_rules! impl_consumer {
 
         #[inline]
         pub fn len(&self) -> u32 {
-            self.0.cursor.cached_producer_len()
+            self.0.cursor.cached_consumer_len()
         }
 
         #[inline]
@@ -271,21 +264,15 @@ macro_rules! impl_consumer {
             self.0.cursor.cached_consumer_len() == 0
         }
 
+        #[inline]
+        pub fn is_full(&self) -> bool {
+            self.0.cursor.cached_consumer_len() == self.0.cursor.capacity()
+        }
+
         /// Returns the socket associated with the ring
         #[inline]
         pub fn socket(&self) -> &socket::Fd {
             &self.0.socket
-        }
-
-        #[inline]
-        pub fn sync(&mut self) {
-            self.0.cursor.acquire_consumer(u32::MAX);
-            self.0.cursor.acquire_producer(u32::MAX);
-        }
-
-        #[inline]
-        pub(crate) fn driver_clone(&self) -> Self {
-            Self(self.0.clone())
         }
 
         #[cfg(test)]
@@ -309,11 +296,6 @@ pub struct Rx(Ring<RxTxDescriptor>);
 
 impl Rx {
     impl_consumer!(RxTxDescriptor, set_rx_ring_size, rx, RX_RING);
-
-    #[inline]
-    pub(crate) fn producer_index(&self) -> u32 {
-        self.0.cursor.cached_producer()
-    }
 }
 
 /// The fill ring for entries to be populated
@@ -322,6 +304,20 @@ pub struct Fill(Ring<UmemDescriptor>);
 
 impl Fill {
     impl_producer!(UmemDescriptor, set_fill_ring_size, fill, FILL_RING);
+
+    #[inline]
+    pub fn init<I: Iterator<Item = UmemDescriptor>>(&mut self, descriptors: I) {
+        debug_assert!(self.len() as usize == self.capacity());
+
+        let (head, tail) = self.data();
+        let items = head.iter_mut().chain(tail);
+        let mut count = 0;
+        for (item, desc) in items.zip(descriptors) {
+            *item = desc;
+            count += 1;
+        }
+        self.release(count);
+    }
 }
 
 /// The completion ring for entries to be reused for transmission
@@ -335,6 +331,28 @@ impl Completion {
         completion,
         COMPLETION_RING
     );
+
+    #[inline]
+    pub fn init<I: Iterator<Item = UmemDescriptor>>(&mut self, descriptors: I) {
+        debug_assert!(self.is_empty());
+
+        {
+            // pretend we're the producer at the start
+            let size = self.capacity() as u32;
+            self.0
+                .cursor
+                .producer()
+                .fetch_add(size, core::sync::atomic::Ordering::SeqCst);
+
+            self.acquire(size);
+        }
+
+        let (head, tail) = self.data();
+        let items = head.iter_mut().chain(tail);
+        for (item, desc) in items.zip(descriptors) {
+            *item = desc;
+        }
+    }
 }
 
 #[cfg(test)]

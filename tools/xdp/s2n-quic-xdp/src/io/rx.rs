@@ -13,6 +13,9 @@ use s2n_quic_core::{
     xdp::{decoder, path},
 };
 
+#[cfg(feature = "tokio")]
+mod tokio_impl;
+
 /// An interface to handle any errors that happen on the RX IO provider
 pub trait ErrorLogger: Send {
     /// Called any time the packet could not be decoded.
@@ -22,26 +25,25 @@ pub trait ErrorLogger: Send {
     fn log_invalid_packet(&mut self, bytes: &[u8]);
 }
 
-pub struct Channel {
-    pub rx: ring::Rx,
-    pub rx_waker: atomic_waker::Handle,
-    pub fill: ring::Fill,
+pub trait Driver: 'static {
+    fn poll(&mut self, rx: &mut ring::Rx, fill: &mut ring::Fill, cx: &mut Context) -> Option<u32>;
 }
 
-impl Channel {
+impl Driver for atomic_waker::Handle {
     #[inline]
-    fn acquire(&mut self, cx: &mut Context) -> Option<u32> {
+    fn poll(&mut self, rx: &mut ring::Rx, fill: &mut ring::Fill, cx: &mut Context) -> Option<u32> {
         let mut count = 0;
 
         // iterate twice to avoid race conditions on the waker registration
         for i in 0..2 {
-            count = self.rx.acquire(u32::MAX);
+            count = rx.acquire(u32::MAX);
+            count = fill.acquire(count).min(count);
             if count > 0 {
                 break;
             }
 
             // check to see if the channel is open
-            if !self.rx_waker.is_open() {
+            if !self.is_open() {
                 return None;
             }
 
@@ -49,13 +51,26 @@ impl Channel {
                 continue;
             }
 
-            trace!("registering rx_waker");
-            self.rx_waker.register(cx.waker());
-            trace!("waking rx_waker");
-            self.rx_waker.wake();
+            trace!("registering waker");
+            self.register(cx.waker());
+            trace!("waking waker");
+            self.wake();
         }
 
-        Some(self.fill.acquire(count).min(count))
+        Some(count)
+    }
+}
+
+pub struct Channel<D: Driver> {
+    pub rx: ring::Rx,
+    pub fill: ring::Fill,
+    pub driver: D,
+}
+
+impl<D: Driver> Channel<D> {
+    #[inline]
+    fn acquire(&mut self, cx: &mut Context) -> Option<u32> {
+        self.driver.poll(&mut self.rx, &mut self.fill, cx)
     }
 
     #[inline]
@@ -88,15 +103,15 @@ impl Channel {
     }
 }
 
-pub struct Rx {
-    channels: Vec<Channel>,
+pub struct Rx<D: Driver> {
+    channels: Vec<Channel<D>>,
     umem: Umem,
     error_logger: Option<Box<dyn ErrorLogger>>,
 }
 
-impl Rx {
+impl<D: Driver> Rx<D> {
     /// Creates a RX IO interface for an s2n-quic endpoint
-    pub fn new(channels: Vec<Channel>, umem: Umem) -> Self {
+    pub fn new(channels: Vec<Channel<D>>, umem: Umem) -> Self {
         Self {
             channels,
             umem,
@@ -111,9 +126,9 @@ impl Rx {
     }
 }
 
-impl rx::Rx for Rx {
+impl<D: Driver> rx::Rx for Rx<D> {
     type PathHandle = path::Tuple;
-    type Queue = Queue<'static>;
+    type Queue = Queue<'static, D>;
     type Error = ();
 
     #[inline]
@@ -184,13 +199,13 @@ impl rx::Rx for Rx {
     }
 }
 
-pub struct Queue<'a> {
-    channels: &'a mut Vec<Channel>,
+pub struct Queue<'a, D: Driver> {
+    channels: &'a mut Vec<Channel<D>>,
     umem: &'a mut Umem,
     error_logger: &'a mut Option<Box<dyn ErrorLogger>>,
 }
 
-impl<'a> rx::Queue for Queue<'a> {
+impl<'a, D: Driver> rx::Queue for Queue<'a, D> {
     type Handle = path::Tuple;
 
     #[inline]

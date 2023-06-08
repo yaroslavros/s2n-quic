@@ -148,6 +148,7 @@ impl<T: Copy> Cursor<T> {
     /// See [xsk.h](https://github.com/xdp-project/xdp-tools/blob/a76e7a2b156b8cfe38992206abe9df1df0a29e38/headers/xdp/xsk.h#L92).
     #[inline]
     pub fn acquire_producer(&mut self, watermark: u32) -> u32 {
+        let watermark = watermark.min(self.size);
         let free = self.cached_len;
 
         // if we have enough space, then return the cached value
@@ -222,6 +223,7 @@ impl<T: Copy> Cursor<T> {
     /// See [xsk.h](https://github.com/xdp-project/xdp-tools/blob/a76e7a2b156b8cfe38992206abe9df1df0a29e38/headers/xdp/xsk.h#L112).
     #[inline]
     pub fn acquire_consumer(&mut self, watermark: u32) -> u32 {
+        let watermark = watermark.min(self.size);
         let filled = self.cached_len;
 
         if filled >= watermark {

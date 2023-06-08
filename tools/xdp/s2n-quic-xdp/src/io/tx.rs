@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ring, umem::Umem};
+use crate::{ring, syscall, umem::Umem};
 use core::task::{Context, Poll};
 use s2n_codec::{Encoder as _, EncoderBuffer};
 use s2n_quic_core::{
@@ -11,24 +11,42 @@ use s2n_quic_core::{
     xdp::{encoder, path},
 };
 
-pub use tx::TxExt;
+pub trait Driver: 'static {
+    #[inline]
+    fn poll(
+        &mut self,
+        tx: &mut ring::Tx,
+        completion: &mut ring::Completion,
+        cx: &mut Context,
+    ) -> Option<bool> {
+        let _ = tx;
+        let _ = completion;
+        let _ = cx;
+        Some(false)
+    }
 
-pub struct Channel {
-    pub tx: ring::Tx,
-    pub tx_waker: atomic_waker::Handle,
-    pub completion: ring::Completion,
+    #[inline]
+    fn wake(&mut self, tx: &mut ring::Tx, completion: &mut ring::Completion) {
+        let _ = tx;
+        let _ = completion;
+    }
 }
 
-impl Channel {
-    #[inline]
-    fn acquire(&mut self, cx: &mut Context) -> Option<bool> {
-        trace!("acquiring channel capacity");
+impl Driver for () {}
 
-        let was_empty = self.is_empty();
+impl Driver for atomic_waker::Handle {
+    #[inline]
+    fn poll(
+        &mut self,
+        tx: &mut ring::Tx,
+        completion: &mut ring::Completion,
+        cx: &mut Context,
+    ) -> Option<bool> {
+        let was_empty = tx.is_empty() || completion.is_empty();
 
         for i in 0..2 {
-            let count = self.completion.acquire(u32::MAX);
-            let count = self.tx.acquire(count).min(count);
+            let count = completion.acquire(u32::MAX);
+            let count = tx.acquire(count).min(count);
 
             trace!("acquired {count} entries");
 
@@ -36,7 +54,7 @@ impl Channel {
                 return Some(was_empty);
             }
 
-            if !self.tx_waker.is_open() {
+            if !self.is_open() {
                 return None;
             }
 
@@ -45,14 +63,89 @@ impl Channel {
             }
 
             if was_empty {
-                trace!("registering tx_waker");
-                self.tx_waker.register(cx.waker());
-                trace!("waking tx_waker");
-                self.tx_waker.wake();
+                trace!("registering waker");
+                self.register(cx.waker());
+                trace!("waking waker");
+                self.wake(tx, completion);
             }
         }
 
+        // we need to keep polling until we have at least one item here
+        if tx.needs_wakeup() || completion.is_empty() || tx.is_empty() {
+            atomic_waker::Handle::wake(self);
+        }
+
         Some(false)
+    }
+
+    #[inline]
+    fn wake(&mut self, tx: &mut ring::Tx, _completion: &mut ring::Completion) {
+        if tx.needs_wakeup() {
+            atomic_waker::Handle::wake(self);
+        }
+    }
+}
+
+pub struct BusyPoll;
+
+impl Driver for BusyPoll {
+    #[inline]
+    fn poll(
+        &mut self,
+        tx: &mut ring::Tx,
+        completion: &mut ring::Completion,
+        cx: &mut Context,
+    ) -> Option<bool> {
+        let was_empty = tx.is_empty() || completion.is_empty();
+
+        for i in 0..2 {
+            let count = completion.acquire(u32::MAX);
+            let count = tx.acquire(count).min(count);
+
+            trace!("acquired {count} entries");
+
+            if count > 0 {
+                return Some(was_empty);
+            }
+
+            if i == 0 {
+                self.wake(tx, completion);
+            }
+        }
+
+        // we need to keep polling until we have at least one item here
+        if completion.is_empty() || tx.is_empty() {
+            cx.waker().wake_by_ref();
+        }
+
+        Some(false)
+    }
+
+    #[inline]
+    fn wake(&mut self, tx: &mut ring::Tx, _completion: &mut ring::Completion) {
+        if tx.needs_wakeup() {
+            let _ = syscall::wake_tx(tx.socket());
+        }
+    }
+}
+
+pub struct Channel<D: Driver> {
+    pub tx: ring::Tx,
+    pub completion: ring::Completion,
+    pub driver: D,
+}
+
+impl<D: Driver> Channel<D> {
+    #[inline]
+    fn acquire(&mut self, cx: &mut Context) -> Option<bool> {
+        // don't try to drive anything if the queues are both full
+        if self.tx.is_full() && self.completion.is_full() {
+            return Some(false);
+        }
+
+        trace!("acquiring channel capacity");
+
+        self.driver.poll(&mut self.tx, &mut self.completion, cx)
     }
 
     #[inline]
@@ -61,24 +154,20 @@ impl Channel {
     }
 
     #[inline]
-    fn wake_tx(&mut self) {
-        trace!("needs wakeup: {}", self.tx.needs_wakeup());
-        if self.tx.needs_wakeup() || self.is_empty() {
-            trace!("tx_waker wake");
-            self.tx_waker.wake();
-        }
+    fn wake(&mut self) {
+        self.driver.wake(&mut self.tx, &mut self.completion);
     }
 }
 
-pub struct Tx {
-    channels: Vec<Channel>,
+pub struct Tx<D: Driver> {
+    channels: Vec<Channel<D>>,
     umem: Umem,
     encoder: encoder::State,
 }
 
-impl Tx {
+impl<D: Driver> Tx<D> {
     /// Creates a TX IO interface for an s2n-quic endpoint
-    pub fn new(channels: Vec<Channel>, umem: Umem, encoder: encoder::State) -> Self {
+    pub fn new(channels: Vec<Channel<D>>, umem: Umem, encoder: encoder::State) -> Self {
         Self {
             channels,
             umem,
@@ -90,14 +179,14 @@ impl Tx {
     ///
     /// This is used for internal tests only.
     #[cfg(test)]
-    pub fn consume(self) -> Vec<Channel> {
+    pub fn consume(self) -> Vec<Channel<D>> {
         self.channels
     }
 }
 
-impl tx::Tx for Tx {
+impl<D: Driver> tx::Tx for Tx<D> {
     type PathHandle = path::Tuple;
-    type Queue = Queue<'static>;
+    type Queue = Queue<'static, D>;
     type Error = ();
 
     #[inline]
@@ -108,7 +197,9 @@ impl tx::Tx for Tx {
 
         for (idx, channel) in self.channels.iter_mut().enumerate() {
             if let Some(did_become_ready) = channel.acquire(cx) {
-                trace!("channel {idx} became ready: {did_become_ready}");
+                if did_become_ready {
+                    trace!("channel {idx} became ready");
+                }
 
                 is_all_closed = false;
                 is_any_ready |= did_become_ready;
@@ -151,7 +242,7 @@ impl tx::Tx for Tx {
         let mut capacity = 0;
 
         for (idx, channel) in this.channels.iter_mut().enumerate() {
-            let len = channel.tx.acquire(u32::MAX);
+            let len = channel.tx.acquire(1);
             let len = channel.completion.acquire(len).min(len);
             trace!("acquired {len} entries for channel {idx}");
             capacity += len as usize;
@@ -180,8 +271,8 @@ impl tx::Tx for Tx {
     }
 }
 
-pub struct Queue<'a> {
-    channels: &'a mut Vec<Channel>,
+pub struct Queue<'a, D: Driver> {
+    channels: &'a mut Vec<Channel<D>>,
     channel_index: usize,
     channel_needs_wake: bool,
     capacity: usize,
@@ -189,7 +280,7 @@ pub struct Queue<'a> {
     encoder: &'a mut encoder::State,
 }
 
-impl<'a> tx::Queue for Queue<'a> {
+impl<'a, D: Driver> tx::Queue for Queue<'a, D> {
     type Handle = path::Tuple;
 
     const SUPPORTS_ECN: bool = true;
@@ -210,6 +301,7 @@ impl<'a> tx::Queue for Queue<'a> {
             let channel = if let Some(channel) = self.channels.get_mut(self.channel_index) {
                 channel
             } else {
+                // we got to the end of the list without any more capacity
                 return Err(tx::Error::AtCapacity);
             };
 
@@ -218,9 +310,10 @@ impl<'a> tx::Queue for Queue<'a> {
                 break channel;
             }
 
+            // before moving on to the next channel, wake the current one if needed
             if core::mem::take(&mut self.channel_needs_wake) {
                 trace!("waking channel {}", self.channel_index);
-                channel.wake_tx();
+                channel.wake();
             }
             self.channel_index += 1;
         };
@@ -254,6 +347,8 @@ impl<'a> tx::Queue for Queue<'a> {
         // make sure we give capacity back to the free queue
         channel.tx.release(1);
         channel.completion.release(1);
+
+        // remember that we pushed something to the channel so it needs to be woken up
         self.channel_needs_wake = true;
 
         // check to see if we're full now
@@ -274,13 +369,13 @@ impl<'a> tx::Queue for Queue<'a> {
     }
 }
 
-impl<'a> Drop for Queue<'a> {
+impl<'a, D: Driver> Drop for Queue<'a, D> {
     #[inline]
     fn drop(&mut self) {
         if self.channel_needs_wake {
             if let Some(channel) = self.channels.get_mut(self.channel_index) {
                 trace!("waking channel {}", self.channel_index);
-                channel.wake_tx();
+                channel.wake();
             }
         }
     }
