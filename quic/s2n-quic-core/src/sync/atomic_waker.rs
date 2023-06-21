@@ -46,7 +46,9 @@ pub struct Handle {
     storage: Pin<Arc<Storage>>,
 }
 
+/// Safety: Pointers live as long as the storage
 unsafe impl Send for Handle {}
+/// Safety: Pointers live as long as the storage
 unsafe impl Sync for Handle {}
 
 impl Handle {
@@ -71,6 +73,7 @@ impl Handle {
         unsafe { (*self.is_open).load(Ordering::Acquire) }
     }
 
+    /// Polls the handle until the peer handle has been closed
     #[inline]
     pub fn poll_close(&mut self, cx: &mut Context) -> Poll<()> {
         if !self.is_open() {

@@ -16,19 +16,11 @@ struct Ring<T: Copy + fmt::Debug> {
     cursor: Cursor<T>,
     flags: NonNull<RingFlags>,
     // make the area clonable in test mode
+    #[cfg(test)]
     area: std::sync::Arc<Mmap>,
+    #[cfg(not(test))]
+    area: Mmap,
     socket: socket::Fd,
-}
-
-impl<T: Copy + fmt::Debug> Clone for Ring<T> {
-    fn clone(&self) -> Self {
-        Self {
-            cursor: self.cursor.clone(),
-            flags: self.flags,
-            area: self.area.clone(),
-            socket: self.socket.clone(),
-        }
-    }
 }
 
 impl<T: Copy + fmt::Debug> Ring<T> {
@@ -110,6 +102,7 @@ macro_rules! impl_producer {
                 (builder.build_producer(), flags)
             };
 
+            #[cfg(test)]
             let area = std::sync::Arc::new(area);
 
             Ok(Self(Ring {
@@ -208,6 +201,7 @@ macro_rules! impl_consumer {
                 (builder.build_consumer(), flags)
             };
 
+            #[cfg(test)]
             let area = std::sync::Arc::new(area);
 
             Ok(Self(Ring {

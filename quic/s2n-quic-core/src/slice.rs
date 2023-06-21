@@ -7,7 +7,7 @@ use core::ops::{Deref, DerefMut};
 ///
 /// The number of copied items is limited by the minimum of the lengths of each of the slices.
 ///
-/// Returns the number of bytes that were copied
+/// Returns the number of entries that were copied
 #[inline]
 pub fn vectored_copy<A, B, T>(from: &[A], to: &mut [B]) -> usize
 where
@@ -15,7 +15,7 @@ where
     B: Deref<Target = [T]> + DerefMut,
     T: Copy,
 {
-    zip(from, to, |a, b| {
+    zip_chunks(from, to, |a, b| {
         b.copy_from_slice(a);
     })
 }
@@ -26,7 +26,26 @@ where
 ///
 /// Returns the number of entries that were processed
 #[inline]
-pub fn zip<A, At, B, Bt, F>(from: &[A], to: &mut [B], mut on_slice: F) -> usize
+pub fn zip<A, At, B, Bt, F>(from: &[A], to: &mut [B], mut on_item: F) -> usize
+where
+    A: Deref<Target = [At]>,
+    B: Deref<Target = [Bt]> + DerefMut,
+    F: FnMut(&At, &mut Bt),
+{
+    zip_chunks(from, to, |a, b| {
+        for (a, b) in a.iter().zip(b) {
+            on_item(a, b);
+        }
+    })
+}
+
+/// Zips overlapping chunks from one slice to another
+///
+/// The number of copied items is limited by the minimum of the lengths of each of the slices.
+///
+/// Returns the number of entries that were processed
+#[inline]
+pub fn zip_chunks<A, At, B, Bt, F>(from: &[A], to: &mut [B], mut on_slice: F) -> usize
 where
     A: Deref<Target = [At]>,
     B: Deref<Target = [Bt]> + DerefMut,

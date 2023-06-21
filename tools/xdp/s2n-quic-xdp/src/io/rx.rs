@@ -89,11 +89,9 @@ impl<D: Driver> Channel<D> {
         let mut fill = [fill.0, fill.1];
 
         let count = zip(&rx, &mut fill, |rx, fill| {
-            for (rx, fill) in rx.iter().copied().zip(fill) {
-                on_packet(rx);
-                // send the descriptor to the fill queue
-                *fill = rx.into();
-            }
+            on_packet(*rx);
+            // send the descriptor to the fill queue
+            *fill = rx.into();
         });
 
         trace!("releasing {count} descriptors");
