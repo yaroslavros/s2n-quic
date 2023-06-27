@@ -160,6 +160,7 @@ impl<'a> ProtectedShort<'a> {
         Ok((packet, remaining))
     }
 
+    #[inline]
     pub fn unprotect<H: OneRttHeaderKey>(
         self,
         header_key: &H,

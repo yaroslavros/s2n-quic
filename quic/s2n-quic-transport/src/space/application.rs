@@ -444,11 +444,13 @@ impl<Config: endpoint::Config> ApplicationSpace<Config> {
     ///
     /// Sending is app limited if the application is not fully utilizing the available
     /// congestion window currently and there is no more application data remaining to send.
+    #[inline]
     fn is_app_limited(&self, path: &Path<Config>, bytes_sent: usize) -> bool {
         !path.is_congestion_limited(bytes_sent) && !self.has_transmission_interest()
     }
 
     /// Validate packets in the Application packet space
+    #[inline]
     pub fn validate_and_decrypt_packet<'a, Pub: event::ConnectionPublisher>(
         &mut self,
         protected: ProtectedShort<'a>,
@@ -686,6 +688,7 @@ impl<'a, Config: endpoint::Config> recovery::Context<Config> for RecoveryContext
 impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> {
     const INVALID_FRAME_ERROR: &'static str = "invalid frame in application space";
 
+    #[inline]
     fn handle_crypto_frame<Pub: event::ConnectionPublisher>(
         &mut self,
         _frame: CryptoRef,
@@ -703,6 +706,7 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
         Ok(())
     }
 
+    #[inline]
     fn handle_ack_frame<A: AckRanges, Pub: event::ConnectionPublisher>(
         &mut self,
         frame: Ack<A>,
@@ -730,6 +734,7 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
         )
     }
 
+    #[inline]
     fn handle_connection_close_frame(
         &mut self,
         _frame: ConnectionClose,
@@ -739,6 +744,7 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
         Ok(())
     }
 
+    #[inline]
     fn handle_stream_frame(
         &mut self,
         frame: StreamRef,
@@ -754,6 +760,7 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
         Ok(())
     }
 
+    #[inline]
     fn handle_datagram_frame(
         &mut self,
         path: s2n_quic_core::event::api::Path<'_>,
@@ -763,14 +770,17 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
         Ok(())
     }
 
+    #[inline]
     fn handle_data_blocked_frame(&mut self, frame: DataBlocked) -> Result<(), transport::Error> {
         self.stream_manager.on_data_blocked(frame)
     }
 
+    #[inline]
     fn handle_max_data_frame(&mut self, frame: MaxData) -> Result<(), transport::Error> {
         self.stream_manager.on_max_data(frame)
     }
 
+    #[inline]
     fn handle_max_stream_data_frame(
         &mut self,
         frame: MaxStreamData,
@@ -778,18 +788,22 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
         self.stream_manager.on_max_stream_data(&frame)
     }
 
+    #[inline]
     fn handle_max_streams_frame(&mut self, frame: MaxStreams) -> Result<(), transport::Error> {
         self.stream_manager.on_max_streams(&frame)
     }
 
+    #[inline]
     fn handle_reset_stream_frame(&mut self, frame: ResetStream) -> Result<(), transport::Error> {
         self.stream_manager.on_reset_stream(&frame)
     }
 
+    #[inline]
     fn handle_stop_sending_frame(&mut self, frame: StopSending) -> Result<(), transport::Error> {
         self.stream_manager.on_stop_sending(&frame)
     }
 
+    #[inline]
     fn handle_stream_data_blocked_frame(
         &mut self,
         frame: StreamDataBlocked,
@@ -797,6 +811,7 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
         self.stream_manager.on_stream_data_blocked(&frame)
     }
 
+    #[inline]
     fn handle_streams_blocked_frame(
         &mut self,
         frame: StreamsBlocked,
@@ -804,6 +819,7 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
         self.stream_manager.on_streams_blocked(&frame)
     }
 
+    #[inline]
     fn handle_new_token_frame(&mut self, frame: NewToken) -> Result<(), transport::Error> {
         //= https://www.rfc-editor.org/rfc/rfc9000#section-19.7
         //# A server MUST treat receipt
@@ -818,6 +834,7 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
         Ok(())
     }
 
+    #[inline]
     fn handle_new_connection_id_frame<Pub: event::ConnectionPublisher>(
         &mut self,
         frame: NewConnectionId,
@@ -856,6 +873,7 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
         )
     }
 
+    #[inline]
     fn handle_retire_connection_id_frame(
         &mut self,
         frame: RetireConnectionId,
@@ -892,6 +910,7 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
             .map_err(|err| transport::Error::PROTOCOL_VIOLATION.with_reason(err.message()))
     }
 
+    #[inline]
     fn handle_path_challenge_frame(
         &mut self,
         frame: PathChallenge,
@@ -902,6 +921,7 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
         Ok(())
     }
 
+    #[inline]
     fn handle_path_response_frame<Pub: event::ConnectionPublisher>(
         &mut self,
         frame: PathResponse,
@@ -912,6 +932,7 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
         Ok(())
     }
 
+    #[inline]
     fn handle_handshake_done_frame<Pub: event::ConnectionPublisher>(
         &mut self,
         frame: HandshakeDone,
@@ -943,6 +964,7 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
         Ok(())
     }
 
+    #[inline]
     fn on_processed_packet<Pub: event::ConnectionPublisher>(
         &mut self,
         processed_packet: ProcessedPacket,

@@ -136,8 +136,24 @@ impl<T: Copy> Cursor<T> {
     }
 
     /// Returns the overall size of the ring
+    #[inline]
     pub const fn capacity(&self) -> u32 {
         self.size
+    }
+
+    #[inline]
+    pub const fn cached_len(&self) -> u32 {
+        self.cached_len
+    }
+
+    #[inline]
+    pub const fn is_empty(&self) -> bool {
+        self.cached_len == 0
+    }
+
+    #[inline]
+    pub const fn is_full(&self) -> bool {
+        self.cached_len == self.size
     }
 
     /// Acquires a cursor index for a producer half

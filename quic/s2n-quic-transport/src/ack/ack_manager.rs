@@ -92,6 +92,7 @@ impl AckManager {
     }
 
     /// Called when an outgoing packet is being assembled
+    #[inline]
     pub fn on_transmit<W: WriteContext>(&mut self, context: &mut W) -> bool {
         let constraint = context.transmission_constraint();
         let mode = context.transmission_mode();
@@ -120,6 +121,7 @@ impl AckManager {
     }
 
     /// Called after an outgoing packet is assembled and `on_transmit` returned `true`
+    #[inline]
     pub fn on_transmit_complete<W: WriteContext>(&mut self, context: &mut W) {
         debug_assert!(
             self.transmission_state.should_transmit(
@@ -179,6 +181,7 @@ impl AckManager {
     }
 
     /// Called when a set of packets was acknowledged
+    #[inline]
     pub fn on_packet_ack<A: ack::Set>(&mut self, _timestamp: Timestamp, ack_set: &A) {
         if let Some(ack_range) = self.ack_eliciting_transmissions.on_update(ack_set) {
             self.ack_ranges
@@ -191,6 +194,7 @@ impl AckManager {
     }
 
     /// Called when a set of packets was reported lost
+    #[inline]
     pub fn on_packet_loss<A: ack::Set>(&mut self, ack_set: &A) {
         if self
             .ack_eliciting_transmissions
@@ -204,6 +208,7 @@ impl AckManager {
     }
 
     /// Called after an RX packet has been processed
+    #[inline]
     pub fn on_processed_packet<Pub: event::ConnectionPublisher>(
         &mut self,
         processed_packet: &ProcessedPacket,
@@ -233,7 +238,10 @@ impl AckManager {
         //
         // Most likely, this packet is very old and the contents have already
         // been retransmitted by the peer.
-        if let Err(err) = self.ack_ranges.insert_packet_number(packet_number) {
+        if let Err(err) = self
+            .ack_ranges
+            .insert_packet_number(packet_number, is_largest)
+        {
             match err {
                 AckRangesError::RangeInsertionFailed { min, max }
                 | AckRangesError::LowestRangeDropped { min, max } => {
@@ -352,6 +360,7 @@ impl AckManager {
     }
 
     /// Called when the connection timer expired
+    #[inline]
     pub fn on_timeout(&mut self, timestamp: Timestamp) {
         // NOTE: ack_elicitation_timer is not actively polled
 
@@ -362,11 +371,13 @@ impl AckManager {
     }
 
     /// Returns the largest received packet number that has been ACKed at least once
+    #[inline]
     pub fn largest_received_packet_number_acked(&self) -> PacketNumber {
         self.largest_received_packet_number_acked
     }
 
     /// Computes the ack_delay field for the current state
+    #[inline]
     fn ack_delay(&self, now: Timestamp) -> VarInt {
         let ack_delay = self
             .largest_received_packet_number_at

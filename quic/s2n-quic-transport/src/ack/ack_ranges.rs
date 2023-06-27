@@ -34,12 +34,20 @@ impl AckRanges {
     pub fn insert_packet_number_range(
         &mut self,
         pn_range: PacketNumberRange,
+        is_largest: bool,
     ) -> Result<(), AckRangesError> {
         let interval = (
             Bound::Included(pn_range.start()),
             Bound::Included(pn_range.end()),
         );
-        if self.0.insert(interval).is_ok() {
+
+        let outcome = if is_largest {
+            self.0.insert_back(interval)
+        } else {
+            self.0.insert(interval)
+        };
+
+        if outcome.is_ok() {
             return Ok(());
         }
 
@@ -88,8 +96,12 @@ impl AckRanges {
     pub fn insert_packet_number(
         &mut self,
         packet_number: PacketNumber,
+        is_largest: bool,
     ) -> Result<(), AckRangesError> {
-        self.insert_packet_number_range(PacketNumberRange::new(packet_number, packet_number))
+        self.insert_packet_number_range(
+            PacketNumberRange::new(packet_number, packet_number),
+            is_largest,
+        )
     }
 
     /// Returns the overall range of the ack_ranges
@@ -114,6 +126,7 @@ type AckRangesIter<'a> = core::iter::Map<
 impl<'a> ack::AckRanges for &'a AckRanges {
     type Iter = AckRangesIter<'a>;
 
+    #[inline]
     fn ack_ranges(&self) -> Self::Iter {
         self.0.inclusive_ranges().rev().map(|range| {
             let (start, end) = range.into_inner();
@@ -125,12 +138,14 @@ impl<'a> ack::AckRanges for &'a AckRanges {
 impl Deref for AckRanges {
     type Target = IntervalSet<PacketNumber>;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
 impl DerefMut for AckRanges {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

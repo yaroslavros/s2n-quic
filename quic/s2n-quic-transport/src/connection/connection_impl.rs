@@ -264,6 +264,7 @@ macro_rules! transmission_context {
 }
 
 impl<Config: endpoint::Config> ConnectionImpl<Config> {
+    #[inline]
     fn update_crypto_state(
         &mut self,
         timestamp: Timestamp,
@@ -334,6 +335,7 @@ impl<Config: endpoint::Config> ConnectionImpl<Config> {
     }
 
     /// Returns the idle timeout based on transport parameters of both peers
+    #[inline]
     fn get_idle_timer_duration(&self) -> Option<Duration> {
         //= https://www.rfc-editor.org/rfc/rfc9000#section-10.1
         //# Each endpoint advertises a max_idle_timeout, but the effective value
@@ -356,6 +358,7 @@ impl<Config: endpoint::Config> ConnectionImpl<Config> {
         Some(Duration::from_millis(duration))
     }
 
+    #[inline]
     fn on_processed_packet(
         &mut self,
         packet: &ProcessedPacket,
@@ -389,6 +392,7 @@ impl<Config: endpoint::Config> ConnectionImpl<Config> {
         Ok(())
     }
 
+    #[inline]
     fn on_ack_eliciting_packet_sent(&mut self, timestamp: Timestamp) {
         //= https://www.rfc-editor.org/rfc/rfc9000#section-10.1
         //# An endpoint also restarts its
@@ -404,6 +408,7 @@ impl<Config: endpoint::Config> ConnectionImpl<Config> {
         }
     }
 
+    #[inline]
     fn current_pto(&self) -> Duration {
         self.path_manager.active_path().pto_period({
             // Incorporate `max_ack_delay` into the timeout
@@ -416,6 +421,7 @@ impl<Config: endpoint::Config> ConnectionImpl<Config> {
     /// Since non-probing frames can only be sent on the active path, a separate
     /// transmission context with Mode::PathValidationOnly is used to send on
     /// other paths.
+    #[inline]
     fn path_validation_only_transmission<'a, Tx: tx::Queue<Handle = Config::PathHandle>>(
         &mut self,
         queue: &mut Tx,
@@ -467,6 +473,7 @@ impl<Config: endpoint::Config> ConnectionImpl<Config> {
         count
     }
 
+    #[inline]
     fn on_supervisor_timeout(
         &mut self,
         timestamp: Timestamp,
@@ -522,6 +529,7 @@ impl<Config: endpoint::Config> ConnectionImpl<Config> {
     /// Polls for the connection to flush all of the outstanding streams
     ///
     /// Once all of the streams are finished, `Poll::Ready` will be returned
+    #[inline]
     fn poll_flush(&mut self) -> Poll<()> {
         if matches!(self.state, ConnectionState::Flushing) {
             let is_finished = if let Some((space, _)) = self.space_manager.application_mut() {
@@ -551,6 +559,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
     /// Static configuration of a connection
     type Config = Config;
 
+    #[inline]
     fn is_handshaking(&self) -> bool {
         self.accept_state == AcceptState::Handshaking
     }
@@ -665,11 +674,13 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
     }
 
     /// Returns the Connections internal ID
+    #[inline]
     fn internal_connection_id(&self) -> InternalConnectionId {
         self.event_context.internal_connection_id
     }
 
     /// Returns the QUIC version selected for the current connection
+    #[inline]
     fn quic_version(&self) -> u32 {
         self.event_context.quic_version
     }
@@ -790,6 +801,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
     }
 
     /// Generates and registers new connection IDs using the given `ConnectionIdFormat`
+    #[inline]
     fn on_new_connection_id(
         &mut self,
         connection_id_format: &mut Config::ConnectionIdFormat,
@@ -822,6 +834,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
     }
 
     /// Queries the connection for outgoing packets
+    #[inline]
     fn on_transmit<Tx: tx::Queue<Handle = Config::PathHandle>>(
         &mut self,
         queue: &mut Tx,
@@ -978,6 +991,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
     /// Handles all timeouts on the `Connection`.
     ///
     /// `timestamp` passes the current time.
+    #[inline]
     fn on_timeout(
         &mut self,
         connection_id_mapper: &mut ConnectionIdMapper,
@@ -1077,6 +1091,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
     }
 
     /// Handles all external wakeups on the [`Connection`].
+    #[inline]
     fn on_wakeup(
         &mut self,
         timestamp: Timestamp,
@@ -1096,6 +1111,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
     }
 
     // Packet handling
+    #[inline]
     fn on_datagram_received(
         &mut self,
         path_handle: &Config::PathHandle,
@@ -1161,6 +1177,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
     }
 
     /// Is called when a initial packet had been received
+    #[inline]
     fn handle_initial_packet(
         &mut self,
         datagram: &DatagramInfo,
@@ -1217,6 +1234,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
     }
 
     /// Is called when an unprotected initial packet had been received
+    #[inline]
     fn handle_cleartext_initial_packet(
         &mut self,
         datagram: &DatagramInfo,
@@ -1272,6 +1290,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
 
     /// Is called when a handshake packet had been received
     #[allow(clippy::too_many_arguments)]
+    #[inline]
     fn handle_handshake_packet(
         &mut self,
         datagram: &DatagramInfo,
@@ -1353,6 +1372,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
     }
 
     /// Is called when a short packet had been received
+    #[inline]
     fn handle_short_packet(
         &mut self,
         datagram: &DatagramInfo,
@@ -1454,6 +1474,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
     }
 
     /// Is called when a version negotiation packet had been received
+    #[inline]
     fn handle_version_negotiation_packet(
         &mut self,
         datagram: &DatagramInfo,
@@ -1495,6 +1516,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
     }
 
     /// Is called when a zero rtt packet had been received
+    #[inline]
     fn handle_zero_rtt_packet(
         &mut self,
         datagram: &DatagramInfo,
@@ -1524,6 +1546,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
     }
 
     /// Is called when a retry packet had been received
+    #[inline]
     fn handle_retry_packet(
         &mut self,
         datagram: &DatagramInfo,
@@ -1650,6 +1673,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
         Ok(())
     }
 
+    #[inline]
     fn mark_as_accepted(&mut self) {
         debug_assert!(
             self.accept_state == AcceptState::HandshakeCompleted,
@@ -1657,6 +1681,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
         self.accept_state = AcceptState::Active;
     }
 
+    #[inline]
     fn interests(&self) -> ConnectionInterests {
         use crate::connection::finalization::Provider as _;
         use timer::Provider as _;
@@ -1716,6 +1741,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
 
     // public API methods
 
+    #[inline]
     fn poll_stream_request(
         &mut self,
         stream_id: stream::StreamId,
@@ -1738,6 +1764,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
             .poll_request(stream_id, &mut api_context, request, context)
     }
 
+    #[inline]
     fn poll_accept_stream(
         &mut self,
         stream_type: Option<stream::StreamType>,
@@ -1758,6 +1785,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
         space.stream_manager.poll_accept(stream_type, context)
     }
 
+    #[inline]
     fn poll_open_stream(
         &mut self,
         stream_type: stream::StreamType,
@@ -1776,6 +1804,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
             .poll_open_local_stream(stream_type, open_token, context)
     }
 
+    #[inline]
     fn application_close(&mut self, error: Option<application::Error>) {
         if self.error.is_err() {
             return;
@@ -1793,14 +1822,17 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
         self.wakeup_handle.wakeup();
     }
 
+    #[inline]
     fn server_name(&self) -> Option<ServerName> {
         self.space_manager.server_name.clone()
     }
 
+    #[inline]
     fn application_protocol(&self) -> Bytes {
         self.space_manager.application_protocol.clone()
     }
 
+    #[inline]
     fn ping(&mut self) -> Result<(), connection::Error> {
         self.error?;
 
@@ -1819,6 +1851,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
         Ok(())
     }
 
+    #[inline]
     fn keep_alive(&mut self, enabled: bool) -> Result<(), connection::Error> {
         self.error?;
 
@@ -1837,14 +1870,17 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
         Ok(())
     }
 
+    #[inline]
     fn local_address(&self) -> Result<SocketAddress, connection::Error> {
         Ok(*self.path_manager.active_path().handle.local_address())
     }
 
+    #[inline]
     fn remote_address(&self) -> Result<SocketAddress, connection::Error> {
         Ok(*self.path_manager.active_path().handle.remote_address())
     }
 
+    #[inline]
     fn error(&self) -> Option<connection::Error> {
         self.error.err()
     }
@@ -1871,6 +1907,7 @@ impl<Config: endpoint::Config> connection::Trait for ConnectionImpl<Config> {
         }
     }
 
+    #[inline]
     fn with_event_publisher<F>(
         &mut self,
         timestamp: Timestamp,

@@ -341,6 +341,39 @@ impl<T: IntervalBound> IntervalSet<T> {
         Ok(())
     }
 
+    #[inline]
+    pub fn insert_back<R: RangeBounds<T>>(&mut self, interval: R) -> Result<(), IntervalSetError> {
+        let interval = Interval::from_range_bounds(interval)?;
+
+        let back = if let Some(back) = self.intervals.back_mut() {
+            back
+        } else {
+            self.intervals.push_front(interval);
+            return Ok(());
+        };
+
+        // the interval wasn't actually at the back so do the normal insertion
+        if back.start > interval.start {
+            return self.insert(interval);
+        }
+
+        // it's a simple interval extension
+        if back.end_exclusive() == interval.start || back.contains(&interval.start) {
+            back.end = interval.end;
+
+            self.check_integrity();
+
+            return Ok(());
+        }
+
+        let index = self.intervals.len() - 1;
+        insert(&mut self.intervals, interval, index, self.limit)?;
+
+        self.check_integrity();
+
+        Ok(())
+    }
+
     /// Inserts a single `value` into the `IntervalSet`
     ///
     /// # Examples

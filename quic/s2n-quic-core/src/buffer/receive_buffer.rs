@@ -28,7 +28,7 @@ pub enum ReceiveBufferError {
 /// The default buffer size for slots that the [`ReceiveBuffer`] uses.
 ///
 /// This value was picked as it is typically used for the default memory page size.
-const MIN_BUFFER_ALLOCATION_SIZE: usize = 4096;
+const MIN_BUFFER_ALLOCATION_SIZE: usize = 1024;
 
 /// The value used for when the final size is unknown.
 ///
@@ -426,7 +426,7 @@ impl ReceiveBuffer {
     /// | >=1048575      | 65536           |
     #[inline]
     fn allocation_size(offset: u64) -> usize {
-        for pow in (2..=4).rev() {
+        for pow in (2..=6).rev() {
             let mult = 1 << pow;
             let square = mult * mult;
             let min_offset = (MIN_BUFFER_ALLOCATION_SIZE * square) as u64;

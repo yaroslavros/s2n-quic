@@ -157,17 +157,17 @@ macro_rules! impl_producer {
 
         #[inline]
         pub fn len(&self) -> u32 {
-            self.0.cursor.cached_producer_len()
+            self.0.cursor.cached_len()
         }
 
         #[inline]
         pub fn is_empty(&self) -> bool {
-            self.0.cursor.cached_producer_len() == 0
+            self.0.cursor.is_empty()
         }
 
         #[inline]
         pub fn is_full(&self) -> bool {
-            self.0.cursor.cached_producer_len() == self.0.cursor.capacity()
+            self.0.cursor.is_full()
         }
 
         /// Returns the socket associated with the ring
@@ -250,17 +250,17 @@ macro_rules! impl_consumer {
 
         #[inline]
         pub fn len(&self) -> u32 {
-            self.0.cursor.cached_consumer_len()
+            self.0.cursor.cached_len()
         }
 
         #[inline]
         pub fn is_empty(&self) -> bool {
-            self.0.cursor.cached_consumer_len() == 0
+            self.0.cursor.is_empty()
         }
 
         #[inline]
         pub fn is_full(&self) -> bool {
-            self.0.cursor.cached_consumer_len() == self.0.cursor.capacity()
+            self.0.cursor.is_full()
         }
 
         /// Returns the socket associated with the ring
