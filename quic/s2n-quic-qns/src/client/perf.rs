@@ -90,6 +90,18 @@ impl Perf {
                 return Ok(());
             }
 
+            let count = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+
+            tokio::spawn({
+                let count = count.clone();
+                async move {
+                    loop {
+                        tokio::time::sleep(core::time::Duration::from_secs(1)).await;
+                        println!("{}", count.swap(0, core::sync::atomic::Ordering::Relaxed));
+                    }
+                }
+            });
+
             for _ in 0..streams {
                 let stream = connection.open_bidirectional_stream().await?;
                 let (receive_stream, mut send_stream) = stream.split();
@@ -103,6 +115,8 @@ impl Perf {
                 let r = perf::handle_receive_stream(receive_stream);
 
                 let _ = tokio::try_join!(s, r)?;
+
+                count.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
             }
 
             Ok(())
