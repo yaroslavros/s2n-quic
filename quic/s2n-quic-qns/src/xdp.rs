@@ -88,7 +88,7 @@ impl From<XdpMode> for programs::xdp::XdpFlags {
 
 type SetupResult = Result<(
     umem::Umem,
-    Vec<xdp_io::rx::Channel<Arc<AsyncFd<socket::Fd>>>>,
+    Vec<xdp_io::rx::Channel<xdp_io::rx::BusyPoll>>,
     Vec<(u32, socket::Fd)>,
     Vec<xdp_io::tx::Channel<xdp_io::tx::BusyPoll>>,
 )>;
@@ -161,7 +161,8 @@ impl Xdp {
                 rx_channels.push(xdp_io::rx::Channel {
                     rx,
                     fill,
-                    driver: async_fd.clone(),
+                    driver: xdp_io::rx::BusyPoll,
+                    //driver: async_fd.clone(),
                 });
             };
 

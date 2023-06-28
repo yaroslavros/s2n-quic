@@ -65,6 +65,30 @@ impl Driver for atomic_waker::Handle {
     }
 }
 
+#[derive(Default)]
+pub struct BusyPoll;
+
+impl Driver for BusyPoll {
+    #[inline]
+    fn poll(&mut self, rx: &mut ring::Rx, fill: &mut ring::Fill, cx: &mut Context) -> Option<u32> {
+        let mut count = 0;
+
+        for _ in 0..10 {
+            count = rx.acquire(u32::MAX);
+            count = fill.acquire(count).min(count);
+
+            // we have items to receive and fill so return
+            if count > 0 {
+                break;
+            }
+        }
+
+        cx.waker().wake_by_ref();
+
+        Some(count)
+    }
+}
+
 pub struct Channel<D: Driver> {
     pub rx: ring::Rx,
     pub fill: ring::Fill,
