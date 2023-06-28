@@ -56,8 +56,10 @@ impl Driver for atomic_waker::Handle {
 
         // iterate twice to avoid waker registration races
         for i in 0..2 {
-            let count = completion.acquire(u32::MAX);
-            let count = tx.acquire(count).min(count);
+            let mut count = completion.acquire(u32::MAX);
+            if count > 0 {
+                count = tx.acquire(count).min(count);
+            }
 
             trace!("acquired {count} entries");
 
@@ -113,8 +115,10 @@ impl Driver for BusyPoll {
 
         // iterate twice to avoid waker registration races
         for i in 0..2 {
-            let count = completion.acquire(u32::MAX);
-            let count = tx.acquire(count).min(count);
+            let mut count = completion.acquire(u32::MAX);
+            if count > 0 {
+                count = tx.acquire(count).min(count);
+            }
 
             trace!("acquired {count} entries");
 

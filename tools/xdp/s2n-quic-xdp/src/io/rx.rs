@@ -38,7 +38,9 @@ impl Driver for atomic_waker::Handle {
         // iterate twice to avoid race conditions on the waker registration
         for i in 0..2 {
             count = rx.acquire(u32::MAX);
-            count = fill.acquire(count).min(count);
+            if count > 0 {
+                count = fill.acquire(count).min(count);
+            }
 
             // we have items to receive and fill so return
             if count > 0 {
@@ -75,7 +77,9 @@ impl Driver for BusyPoll {
 
         for _ in 0..10 {
             count = rx.acquire(u32::MAX);
-            count = fill.acquire(count).min(count);
+            if count > 0 {
+                count = fill.acquire(count).min(count);
+            }
 
             // we have items to receive and fill so return
             if count > 0 {
@@ -109,6 +113,10 @@ impl<D: Driver> Channel<D> {
     fn for_each<F: FnMut(RxTxDescriptor)>(&mut self, mut on_packet: F) {
         // one last effort to acquire any packets
         let len = self.rx.acquire(1);
+        if len == 0 {
+            return;
+        }
+
         let len = self.fill.acquire(len);
         if len == 0 {
             return;
