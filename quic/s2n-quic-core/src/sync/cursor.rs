@@ -8,14 +8,14 @@ use core::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
-pub struct Builder<T: Copy> {
+pub struct Builder<T> {
     pub producer: NonNull<AtomicU32>,
     pub consumer: NonNull<AtomicU32>,
     pub data: NonNull<T>,
     pub size: u32,
 }
 
-impl<T: Copy> Builder<T> {
+impl<T> Builder<T> {
     /// Builds a cursor for a producer
     ///
     /// # Safety
@@ -71,7 +71,7 @@ impl<T: Copy> Builder<T> {
 ///
 /// See [xsk.h](https://github.com/xdp-project/xdp-tools/blob/a76e7a2b156b8cfe38992206abe9df1df0a29e38/headers/xdp/xsk.h#L34-L42).
 #[derive(Debug)]
-pub struct Cursor<T: Copy> {
+pub struct Cursor<T> {
     /// A cached value for the producer cursor index
     ///
     /// This is stored locally to avoid atomic synchronization, if possible
@@ -104,7 +104,7 @@ pub struct Cursor<T: Copy> {
     entry: PhantomData<T>,
 }
 
-impl<T: Copy> Cursor<T> {
+impl<T> Cursor<T> {
     /// Initializes a producer cursor
     ///
     /// # Safety

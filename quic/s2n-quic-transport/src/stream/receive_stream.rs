@@ -435,39 +435,41 @@ impl ReceiveStream {
                             .with_frame_type(frame.tag().into())
                     })?;
 
-                if let Some(total_size) = total_size {
-                    if data_end > total_size || frame.is_fin && data_end != total_size {
+                // If we don't know the final size then try acquiring flow control
+                if total_size.is_none() {
+                    self.flow_controller
+                        .acquire_window_up_to(data_end, frame.tag().into())?;
+                }
+
+                // If this is the last frame then inform the receive_buffer so it can check for any
+                // final size errors.
+                let write_result = if frame.is_fin {
+                    self.receive_buffer.write_at_fin(frame.offset, frame.data)
+                } else {
+                    self.receive_buffer.write_at(frame.offset, frame.data)
+                };
+
+                write_result.map_err(|error| {
+                    match error {
+                        //= https://www.rfc-editor.org/rfc/rfc9000#section-19.9
+                        //# An endpoint MUST terminate a connection with an error of type
+                        //# FLOW_CONTROL_ERROR if it receives more data than the maximum data
+                        //# value that it has sent.  This includes violations of remembered
+                        //# limits in Early Data; see Section 7.4.1.
+                        StreamReceiveBufferError::OutOfRange => {
+                            transport::Error::FLOW_CONTROL_ERROR
+                        }
                         //= https://www.rfc-editor.org/rfc/rfc9000#section-4.5
                         //# Once a final size for a stream is known, it cannot change.  If a
                         //# RESET_STREAM or STREAM frame is received indicating a change in the
                         //# final size for the stream, an endpoint SHOULD respond with an error
                         //# of type FINAL_SIZE_ERROR; see Section 11 for details on error
                         //# handling.
-                        return Err(transport::Error::FINAL_SIZE_ERROR
-                            .with_reason("Final size changed")
-                            .with_frame_type(frame.tag().into()));
+                        StreamReceiveBufferError::InvalidFin => transport::Error::FINAL_SIZE_ERROR,
                     }
-                } else {
-                    self.flow_controller
-                        .acquire_window_up_to(data_end, frame.tag().into())?;
-                }
-
-                self.receive_buffer
-                    .write_at(frame.offset, frame.data)
-                    .map_err(|error| {
-                        match error {
-                            //= https://www.rfc-editor.org/rfc/rfc9000#section-19.9
-                            //# An endpoint MUST terminate a connection with an error of type
-                            //# FLOW_CONTROL_ERROR if it receives more data than the maximum data
-                            //# value that it has sent.  This includes violations of remembered
-                            //# limits in Early Data; see Section 7.4.1.
-                            StreamReceiveBufferError::OutOfRange => {
-                                transport::Error::FLOW_CONTROL_ERROR
-                            }
-                        }
-                        .with_reason("data reception error")
-                        .with_frame_type(frame.tag().into())
-                    })?;
+                    .with_reason("data reception error")
+                    .with_frame_type(frame.tag().into())
+                })?;
 
                 // wake the waiter if the buffer has data and the len has crossed the watermark
                 let mut should_wake = self

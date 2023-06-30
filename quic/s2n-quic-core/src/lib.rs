@@ -6,6 +6,10 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+#[cfg(test)]
+#[global_allocator]
+static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 /// Asserts that a boolean expression is true at runtime, only if debug_assertions are enabled.
 ///
 /// Otherwise, the compiler is told to assume that the expression is always true and can perform
@@ -86,3 +90,5 @@ pub mod xdp;
 
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
+
+pub mod streams_v2_playground;

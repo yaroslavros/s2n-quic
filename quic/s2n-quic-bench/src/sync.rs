@@ -18,13 +18,11 @@ fn spsc_benches(c: &mut Criterion) {
             let (mut sender, mut receiver) = spsc::channel(*input);
             b.iter(|| {
                 {
-                    let mut slice = sender.try_slice().unwrap().unwrap();
-                    while slice.push(123usize).is_ok() {}
+                    while sender.push(123usize).is_ok() {}
                 }
 
                 {
-                    let mut slice = receiver.try_slice().unwrap().unwrap();
-                    while slice.pop().is_some() {}
+                    while receiver.pop().is_some() {}
                 }
             });
         });
@@ -49,13 +47,11 @@ fn spsc_benches(c: &mut Criterion) {
             let (mut sender, mut receiver) = spsc::channel(*input);
             b.iter(|| {
                 {
-                    let mut slice = sender.try_slice().unwrap().unwrap();
-                    let _ = slice.extend(&mut core::iter::repeat(123usize));
+                    sender.extend(core::iter::repeat(123usize));
                 }
 
                 {
-                    let mut slice = receiver.try_slice().unwrap().unwrap();
-                    slice.clear();
+                    let _ = receiver.drain().count();
                 }
             });
         });

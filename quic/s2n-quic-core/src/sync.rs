@@ -10,6 +10,8 @@ pub use crossbeam_utils::CachePadded;
 pub mod atomic_waker;
 #[cfg(target_has_atomic = "32")]
 pub mod cursor;
+#[cfg(target_has_atomic = "ptr")]
+pub mod mpsc;
 #[cfg(feature = "alloc")]
 pub mod spsc;
 #[cfg(feature = "alloc")]
