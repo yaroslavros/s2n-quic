@@ -10,8 +10,10 @@ use s2n_quic_core::{
 type Error = std::io::Error;
 type Result<T = (), E = Error> = core::result::Result<T, E>;
 
+pub mod message;
 mod model;
 pub mod network;
+mod socket;
 pub mod time;
 
 pub use model::{Model, TxRecorder};
@@ -259,7 +261,7 @@ impl Io {
 
         let handle = address.unwrap_or_else(|| buffers.generate_addr());
 
-        let (tx, rx) = buffers.register(handle);
+        let (tx, rx) = buffers.register(handle, self.builder.max_mtu);
 
         let clock = time::Clock::default();
 

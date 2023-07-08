@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::socket;
 use core::task::{Context, Poll, Waker};
 use s2n_quic_core::{
     event,
@@ -9,7 +10,7 @@ use s2n_quic_core::{
         self, rx,
         tx::{self, Queue as _},
     },
-    path::{LocalAddress, Tuple},
+    path::{LocalAddress, MaxMtu, Tuple},
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -157,7 +158,14 @@ impl Buffers {
     }
 
     /// Register an address on the network
-    pub fn register(&self, handle: SocketAddress) -> (TxIo, RxIo) {
+    pub fn register(
+        &self,
+        handle: SocketAddress,
+        max_mtu: MaxMtu,
+    ) -> (
+        impl tx::Tx<PathHandle = PathHandle>,
+        impl rx::Rx<PathHandle = PathHandle>,
+    ) {
         let mut lock = self.inner.lock().unwrap();
 
         let queue = Queue::new(handle);
@@ -165,13 +173,72 @@ impl Buffers {
         lock.tx.insert(handle, queue.clone());
         lock.rx.insert(handle, queue);
 
-        let tx = TxIo {
-            buffers: self.clone(),
-            handle,
+        let queue_recv_buffer_size = None;
+        let queue_send_buffer_size = None;
+
+        let rx = {
+            let payload_len = {
+                let max_mtu: u16 = max_mtu.into();
+                max_mtu as u32
+            };
+
+            let rx_buffer_size = queue_recv_buffer_size.unwrap_or(8u32 * (1 << 20));
+            let entries = rx_buffer_size / payload_len;
+            let entries = if entries.is_power_of_two() {
+                entries
+            } else {
+                // round up to the nearest power of two, since the ring buffers require it
+                entries.next_power_of_two()
+            };
+
+            let mut consumers = vec![];
+
+            let (producer, consumer) = socket::ring::pair(entries, payload_len);
+            consumers.push(consumer);
+
+            // spawn a task that actually reads from the socket into the ring buffer
+            super::spawn(super::socket::rx(self.clone(), handle.into(), producer));
+
+            // construct the RX side for the endpoint event loop
+            let max_mtu = MaxMtu::try_from(payload_len as u16).unwrap();
+            socket::io::rx::Rx::new(consumers, max_mtu, handle.into())
         };
-        let rx = RxIo {
-            buffers: self.clone(),
-            handle,
+
+        let tx = {
+            let gso = crate::features::Gso::default();
+            gso.disable();
+
+            // compute the payload size for each message from the number of GSO segments we can
+            // fill
+            let payload_len = {
+                let max_mtu: u16 = max_mtu.into();
+                (max_mtu as u32 * gso.max_segments() as u32).min(u16::MAX as u32)
+            };
+
+            let tx_buffer_size = queue_send_buffer_size.unwrap_or(128 * 1024);
+            let entries = tx_buffer_size / payload_len;
+            let entries = if entries.is_power_of_two() {
+                entries
+            } else {
+                // round up to the nearest power of two, since the ring buffers require it
+                entries.next_power_of_two()
+            };
+
+            let mut producers = vec![];
+
+            let (producer, consumer) = socket::ring::pair(entries, payload_len);
+            producers.push(producer);
+
+            // spawn a task that actually flushes the ring buffer to the socket
+            super::spawn(super::socket::tx(
+                self.clone(),
+                handle.into(),
+                consumer,
+                gso.clone(),
+            ));
+
+            // construct the TX side for the endpoint event loop
+            socket::io::tx::Tx::new(producers, gso, max_mtu)
         };
 
         (tx, rx)
