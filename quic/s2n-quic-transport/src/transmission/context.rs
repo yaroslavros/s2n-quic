@@ -3,8 +3,9 @@
 
 use crate::{contexts::WriteContext, endpoint, path, transmission, transmission::Mode};
 use core::marker::PhantomData;
-use s2n_codec::{Encoder, EncoderBuffer, EncoderValue};
+use s2n_codec::{DecoderBuffer, Encoder, EncoderBuffer, EncoderValue};
 use s2n_quic_core::{
+    datagram,
     event::{self, ConnectionPublisher as _, IntoEvent},
     frame::{ack::AckRanges as AckRangesTrait, ack_elicitation::AckElicitation, Ack, FrameTrait},
     packet::number::PacketNumber,
@@ -162,6 +163,41 @@ impl<'a, 'b, 'sub, Config: endpoint::Config> WriteContext for Context<'a, 'b, 's
     }
 
     #[inline]
+    fn write_raw_datagram_frames(&mut self, chunk: datagram::Chunk) -> Option<PacketNumber> {
+        use s2n_quic_core::frame::{
+            ack_elicitation::AckElicitable, congestion_controlled::CongestionControlled,
+        };
+
+        let data: &[u8] = &[];
+        let frame = s2n_quic_core::frame::Datagram {
+            is_last_frame: false,
+            data,
+        };
+
+        self.check_frame_constraint(&frame);
+        self.outcome.ack_elicitation |= frame.ack_elicitation();
+        self.outcome.is_congestion_controlled |= frame.is_congestion_controlled();
+
+        {
+            let bytes = chunk.as_ref();
+            let mut decoder = DecoderBuffer::new(bytes);
+            while !decoder.is_empty() {
+                let (frame, remaining) = decoder
+                    .decode::<s2n_quic_core::frame::Datagram<&[u8]>>()
+                    .ok()?;
+
+                decoder = remaining;
+
+                // TODO emit the events
+            }
+        }
+
+        self.buffer.encode(&chunk);
+
+        Some(self.packet_number)
+    }
+
+    #[inline]
     fn ack_elicitation(&self) -> AckElicitation {
         self.outcome.ack_elicitation
     }
@@ -251,12 +287,18 @@ impl<'a, C: WriteContext> WriteContext for RetransmissionContext<'a, C> {
         self.context.write_fitted_frame(frame)
     }
 
+    #[inline]
     fn write_frame_forced<Frame>(&mut self, frame: &Frame) -> Option<PacketNumber>
     where
         Frame: EncoderValue + FrameTrait,
         for<'frame> &'frame Frame: IntoEvent<event::builder::Frame>,
     {
         self.context.write_frame_forced(frame)
+    }
+
+    #[inline]
+    fn write_raw_datagram_frames(&mut self, chunk: datagram::Chunk) -> Option<PacketNumber> {
+        self.context.write_raw_datagram_frames(chunk)
     }
 
     #[inline]

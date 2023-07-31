@@ -105,11 +105,17 @@ pub trait Packet {
 
     /// Writes a single datagram to a packet. This function should be called
     /// per datagram.
-    fn write_datagram(&mut self, data: &[u8]) -> Result<(), WriteError>;
+    fn write_datagram(&mut self, data: Chunk) -> Result<(), WriteError>;
 
     /// Writes a single datagram to a packet from a collection of buffers. This function should be
     /// called per datagram.
-    fn write_datagram_vectored(&mut self, data: &[&[u8]]) -> Result<(), WriteError>;
+    fn write_datagram_vectored(&mut self, data: &[Chunk]) -> Result<(), WriteError>;
+
+    /// Writes a raw chunk of bytes into the current packet
+    ///
+    /// Callers _MUST_ ensure the bytes are correctly formatted as QUIC frames, otherwise the peer
+    /// will be unable to parse the packet and likely close the connection.
+    fn write_raw_frame(&mut self, chunk: Chunk) -> Result<(), WriteError>;
 
     /// Returns whether or not there is reliable data waiting to be sent.
     ///
@@ -121,6 +127,62 @@ pub trait Packet {
     /// Datagrams get prioritized every other packet, which gives the application the best
     /// chance to send a large datagram.
     fn datagrams_prioritized(&self) -> bool;
+}
+
+#[non_exhaustive]
+pub enum Chunk<'a> {
+    Slice(&'a [u8]),
+    #[cfg(feature = "alloc")]
+    Bytes(&'a bytes::Bytes),
+}
+
+impl<'a> Chunk<'a> {
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.as_ref().len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<'a> AsRef<[u8]> for Chunk<'a> {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::Slice(v) => v,
+            #[cfg(feature = "alloc")]
+            Self::Bytes(v) => v,
+        }
+    }
+}
+
+impl<'a> From<&'a [u8]> for Chunk<'a> {
+    #[inline]
+    fn from(slice: &'a [u8]) -> Self {
+        Self::Slice(slice)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> From<&'a bytes::Bytes> for Chunk<'a> {
+    #[inline]
+    fn from(slice: &'a bytes::Bytes) -> Self {
+        Self::Bytes(slice)
+    }
+}
+
+impl<'a> s2n_codec::EncoderValue for Chunk<'a> {
+    #[inline]
+    fn encode<E: s2n_codec::Encoder>(&self, encoder: &mut E) {
+        match self {
+            Self::Slice(ref v) => v.encode(encoder),
+            #[cfg(feature = "alloc")]
+            Self::Bytes(ref v) => v.encode(encoder),
+        }
+    }
 }
 
 #[non_exhaustive]

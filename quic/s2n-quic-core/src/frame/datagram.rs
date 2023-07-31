@@ -4,7 +4,8 @@
 use crate::{frame::Tag, varint::VarInt};
 
 use s2n_codec::{
-    decoder_parameterized_value, DecoderBuffer, DecoderBufferMut, Encoder, EncoderValue,
+    decoder_invariant, decoder_parameterized_value, decoder_value, DecoderBuffer, DecoderBufferMut,
+    Encoder, EncoderValue,
 };
 
 //= https://www.rfc-editor.org/rfc/rfc9221#section-4
@@ -78,6 +79,16 @@ impl<Data> Datagram<Data> {
         }
     }
 }
+
+decoder_value!(
+    impl<'a, Data> Datagram<Data> {
+        fn decode(buffer: Buffer) -> Result<Self> {
+            let (tag, remaining) = buffer.decode::<u8>()?;
+            decoder_invariant!(datagram_tag!().contains(&tag), "invalid datagram frame");
+            remaining.decode_parameterized(tag)
+        }
+    }
+);
 
 decoder_parameterized_value!(
     impl<'a, Data> Datagram<Data> {

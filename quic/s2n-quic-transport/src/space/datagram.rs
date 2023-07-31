@@ -12,7 +12,7 @@ use crate::{
 use core::task::Poll;
 use s2n_codec::EncoderValue;
 use s2n_quic_core::{
-    datagram::{Endpoint, ReceiveContext, Receiver, Sender, WriteError},
+    datagram::{Chunk, Endpoint, ReceiveContext, Receiver, Sender, WriteError},
     frame::{self, datagram::DatagramRef},
     query,
     varint::VarInt,
@@ -117,11 +117,11 @@ impl<'a, C: WriteContext> s2n_quic_core::datagram::Packet for Packet<'a, C> {
     }
 
     /// Writes a single datagram to a packet
-    fn write_datagram(&mut self, data: &[u8]) -> Result<(), WriteError> {
+    fn write_datagram(&mut self, data: Chunk) -> Result<(), WriteError> {
         self.write_datagram_vectored(&[data])
     }
 
-    fn write_datagram_vectored(&mut self, data: &[&[u8]]) -> Result<(), WriteError> {
+    fn write_datagram_vectored(&mut self, data: &[Chunk]) -> Result<(), WriteError> {
         let data_len = data.iter().map(|d| d.len()).sum::<usize>();
         if data_len as u64 > self.max_datagram_payload {
             return Err(WriteError::ExceedsPeerTransportLimits);
@@ -132,12 +132,20 @@ impl<'a, C: WriteContext> s2n_quic_core::datagram::Packet for Packet<'a, C> {
             remaining_capacity == frame::datagram::DATAGRAM_TAG.encoding_size() + data_len;
         let frame = frame::Datagram {
             is_last_frame,
-            data,
+            data: DatagramChunks(data),
         };
         self.context
             .write_frame(&frame)
             .ok_or(WriteError::ExceedsPacketCapacity)?;
 
+        Ok(())
+    }
+
+    #[inline]
+    fn write_raw_frame(&mut self, chunk: Chunk) -> Result<(), WriteError> {
+        self.context
+            .write_raw_datagram_frames(chunk)
+            .ok_or(WriteError::ExceedsPacketCapacity)?;
         Ok(())
     }
 
@@ -149,5 +157,16 @@ impl<'a, C: WriteContext> s2n_quic_core::datagram::Packet for Packet<'a, C> {
     /// Returns whether or not datagrams are prioritized in this packet or not
     fn datagrams_prioritized(&self) -> bool {
         self.datagrams_prioritized
+    }
+}
+
+struct DatagramChunks<'a>(&'a [Chunk<'a>]);
+
+impl<'a> EncoderValue for DatagramChunks<'a> {
+    #[inline]
+    fn encode<E: s2n_codec::Encoder>(&self, encoder: &mut E) {
+        for chunk in self.0 {
+            chunk.encode(encoder);
+        }
     }
 }

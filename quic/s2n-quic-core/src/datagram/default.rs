@@ -5,7 +5,7 @@
 
 use crate::{
     connection,
-    datagram::{ConnectionInfo, Packet, PreConnectionInfo, ReceiveContext},
+    datagram::{Chunk, ConnectionInfo, Packet, PreConnectionInfo, ReceiveContext},
     transport::parameters::MaxDatagramFrameSize,
 };
 use alloc::collections::VecDeque;
@@ -463,7 +463,7 @@ impl super::Sender for Sender {
             if let Some(datagram) = self.queue.pop_front() {
                 // Ensure there is enough space in the packet to send a datagram
                 if packet.remaining_capacity() >= datagram.data.len() {
-                    match packet.write_datagram(&datagram.data) {
+                    match packet.write_datagram(Chunk::Bytes(&datagram.data)) {
                         Ok(()) => has_written = true,
                         Err(_error) => {
                             continue;
@@ -552,7 +552,7 @@ impl SenderBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::datagram::WriteError;
+    use crate::datagram::{Chunk, WriteError};
     use core::task::{Context, Poll};
     use futures_test::task::{new_count_waker, noop_waker};
 
@@ -913,16 +913,24 @@ mod tests {
             self.remaining_capacity
         }
 
-        fn write_datagram(&mut self, data: &[u8]) -> Result<(), WriteError> {
+        fn write_datagram(&mut self, data: Chunk) -> Result<(), WriteError> {
             self.write_datagram_vectored(&[data])
         }
 
-        fn write_datagram_vectored(&mut self, data: &[&[u8]]) -> Result<(), WriteError> {
+        fn write_datagram_vectored(&mut self, data: &[Chunk]) -> Result<(), WriteError> {
             let data_len = data.iter().map(|d| d.len()).sum::<usize>();
             if data_len > self.remaining_capacity {
                 return Err(WriteError::ExceedsPacketCapacity);
             }
             self.remaining_capacity -= data_len;
+            Ok(())
+        }
+
+        fn write_raw_frame(&mut self, chunk: Chunk) -> Result<(), WriteError> {
+            if chunk.len() > self.remaining_capacity {
+                return Err(WriteError::ExceedsPacketCapacity);
+            }
+            self.remaining_capacity -= chunk.len();
             Ok(())
         }
 

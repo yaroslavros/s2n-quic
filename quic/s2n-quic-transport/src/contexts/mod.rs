@@ -7,7 +7,7 @@
 use crate::{connection::InternalConnectionId, transmission, wakeup_queue::WakeupHandle};
 use s2n_codec::encoder::EncoderValue;
 use s2n_quic_core::{
-    endpoint,
+    datagram, endpoint,
     event::{self, IntoEvent},
     frame::{ack::AckRanges as AckRangesTrait, ack_elicitation::AckElicitation, Ack, FrameTrait},
     packet::number::PacketNumber,
@@ -64,6 +64,8 @@ pub trait WriteContext {
     where
         Frame: EncoderValue + FrameTrait,
         for<'frame> &'frame Frame: IntoEvent<event::builder::Frame>;
+
+    fn write_raw_datagram_frames(&mut self, chunk: datagram::Chunk) -> Option<PacketNumber>;
 
     /// Returns the ack elicitation of the current packet
     fn ack_elicitation(&self) -> AckElicitation;
