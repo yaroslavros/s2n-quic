@@ -19,6 +19,7 @@ pub mod handshake;
 #[macro_use]
 pub mod retry;
 
+pub mod classify;
 pub mod decoding;
 pub mod encoding;
 pub mod interceptor;

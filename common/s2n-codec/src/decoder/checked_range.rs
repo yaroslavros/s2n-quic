@@ -13,6 +13,7 @@ pub struct CheckedRange {
 }
 
 impl CheckedRange {
+    #[inline(always)]
     pub(crate) fn new(start: usize, end: usize, original_ptr: *const u8) -> Self {
         #[cfg(not(all(debug_assertions, feature = "checked_range_unsafe")))]
         let _ = original_ptr;

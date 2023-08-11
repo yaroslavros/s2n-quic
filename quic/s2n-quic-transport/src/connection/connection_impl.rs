@@ -218,6 +218,31 @@ impl<Config: endpoint::Config> EventContext<Config> {
             &mut self.context,
         )
     }
+
+    #[inline]
+    fn validate_quic_version(&self, version: u32) -> Result<(), ProcessingError> {
+        //= https://www.rfc-editor.org/rfc/rfc9000#section-5.2.1
+        //# If a client receives a packet that uses a different version than it
+        //# initially selected, it MUST discard that packet.
+        if version != self.quic_version {
+            self.with_event_publisher(
+                datagram.timestamp,
+                Some(path_id),
+                subscriber,
+                |publisher, path| {
+                    publisher.on_packet_dropped(event::builder::PacketDropped {
+                        reason: event::builder::PacketDropReason::VersionMismatch {
+                            version,
+                            path: path_event!(path, path_id),
+                        },
+                    })
+                },
+            );
+            return Err(ProcessingError::UnexpectedVersion);
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(s2n_quic_dump_on_panic)]
