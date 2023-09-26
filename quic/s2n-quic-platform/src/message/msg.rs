@@ -16,7 +16,7 @@ use s2n_quic_core::{
     path::{self, Handle as _},
 };
 
-mod ext;
+pub mod ext;
 mod handle;
 #[cfg(test)]
 mod tests;

@@ -10,8 +10,8 @@ extern crate alloc;
 
 mod features;
 pub mod io;
-mod message;
+pub mod message;
 mod socket;
-mod syscall;
+pub mod syscall;
 #[doc(hidden)] // TODO remove this module: https://github.com/aws/s2n-quic/issues/1738
 pub mod time;
