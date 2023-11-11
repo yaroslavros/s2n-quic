@@ -1,13 +1,13 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{ack, packet::number::PacketNumber};
 use core::ops::RangeInclusive;
-use s2n_quic_core::{ack, packet::number::PacketNumber};
 
 pub type AckRange = RangeInclusive<PacketNumber>;
 
 #[derive(Clone, Debug, Default)]
-pub struct AckElicitingTransmissionSet {
+pub struct Set {
     /// A stable ack-eliciting transmission
     ///
     /// In this case, "stable" means the oldest transmission that
@@ -17,15 +17,15 @@ pub struct AckElicitingTransmissionSet {
     /// are always either removed or declared lost. Without it,
     /// the TX packet number would be a moving target
     /// and packet number ranges would never be removed.
-    stable: Option<AckElicitingTransmission>,
+    stable: Option<Transmission>,
 
     /// The latest ack-eliciting transmission
-    latest: Option<AckElicitingTransmission>,
+    latest: Option<Transmission>,
 }
 
-impl AckElicitingTransmissionSet {
+impl Set {
     /// Called when an ACK frame is bundled with an ack eliciting packet
-    pub fn on_transmit(&mut self, transmission: AckElicitingTransmission) {
+    pub fn on_transmit(&mut self, transmission: Transmission) {
         self.latest = Some(transmission);
 
         // only set the stable transmission if it's not set
@@ -69,12 +69,12 @@ impl AckElicitingTransmissionSet {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd)]
-pub struct AckElicitingTransmission {
+pub struct Transmission {
     pub sent_in_packet: PacketNumber,
     pub largest_received_packet_number_acked: PacketNumber,
 }
 
-impl AckElicitingTransmission {
+impl Transmission {
     /// Called when a set of packets was acknowledged or lost
     pub fn ack_range<A: ack::Set>(&self, ack_set: &A) -> Option<AckRange> {
         //= https://www.rfc-editor.org/rfc/rfc9000#section-13.2.4
@@ -102,7 +102,7 @@ mod tests {
     /// This test is meant to simulate an immediate ACK rate from a peer
     #[test]
     fn latest_ack_test() {
-        let mut set = AckElicitingTransmissionSet::default();
+        let mut set = Set::default();
         assert!(set.is_empty());
 
         let mut transmissions = transmissions_iter();
@@ -132,7 +132,7 @@ mod tests {
     /// This test is meant to simulate a delayed ACK rate from a peer
     #[test]
     fn stable_ack_test() {
-        let mut set = AckElicitingTransmissionSet::default();
+        let mut set = Set::default();
         assert!(set.is_empty());
 
         let mut transmissions = transmissions_iter();
@@ -173,12 +173,9 @@ mod tests {
         use insta::assert_debug_snapshot;
 
         assert_debug_snapshot!(
-            "AckElicitingTransmission",
-            size_of::<AckElicitingTransmission>()
+            "ack_eliciting_transmission::Transmission",
+            size_of::<Transmission>()
         );
-        assert_debug_snapshot!(
-            "AckElicitingTransmissionSet",
-            size_of::<AckElicitingTransmissionSet>()
-        );
+        assert_debug_snapshot!("ack_eliciting_transmission::Set", size_of::<Set>());
     }
 }

@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{generator::gen_duration, Network, NetworkEvent, Report};
+use crate::time::{clock::testing as time, Duration};
 use alloc::collections::VecDeque;
 use bolero::generator::*;
-use s2n_quic_core::time::{clock::testing as time, Duration};
 
 #[derive(Clone, Debug, TypeGenerator)]
 pub struct Simulation {
@@ -34,7 +34,7 @@ impl Simulation {
             .client
             .application
             .endpoint
-            .ack_manager
+            .ack_controller
             .ack_ranges
             .clone();
         report.server.pending_ack_ranges = self
@@ -42,7 +42,7 @@ impl Simulation {
             .server
             .application
             .endpoint
-            .ack_manager
+            .ack_controller
             .ack_ranges
             .clone();
 

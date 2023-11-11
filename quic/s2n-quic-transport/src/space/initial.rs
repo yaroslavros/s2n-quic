@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ack::AckManager,
+    ack,
     connection::{self, ConnectionTransmissionContext, ProcessingError},
     endpoint, path,
     path::{path_event, Path},
-    processed_packet::ProcessedPacket,
     recovery,
     space::{CryptoStream, HandshakeStatus, PacketSpace, TxPacketNumbers},
     transmission,
@@ -20,6 +19,7 @@ use s2n_quic_core::{
     frame::{ack::AckRanges, crypto::CryptoRef, Ack, ConnectionClose},
     inet::DatagramInfo,
     packet::{
+        self,
         encoding::{PacketEncoder, PacketEncodingError},
         initial::{CleartextInitial, Initial, ProtectedInitial},
         number::{PacketNumber, PacketNumberRange, PacketNumberSpace, SlidingWindow},
@@ -30,7 +30,7 @@ use s2n_quic_core::{
 use smallvec::SmallVec;
 
 pub struct InitialSpace<Config: endpoint::Config> {
-    pub ack_manager: AckManager,
+    pub ack_controller: ack::Controller,
     //= https://www.rfc-editor.org/rfc/rfc9001#section-4
     //# If QUIC needs to retransmit that data, it MUST use
     //# the same keys even if TLS has already updated to newer keys.
@@ -55,7 +55,7 @@ pub struct InitialSpace<Config: endpoint::Config> {
 impl<Config: endpoint::Config> fmt::Debug for InitialSpace<Config> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("InitialSpace")
-            .field("ack_manager", &self.ack_manager)
+            .field("ack_controller", &self.ack_controller)
             .field("tx_packet_numbers", &self.tx_packet_numbers)
             .field("processed_packet_numbers", &self.processed_packet_numbers)
             .field("recovery_manager", &self.recovery_manager)
@@ -68,10 +68,10 @@ impl<Config: endpoint::Config> InitialSpace<Config> {
         key: <<Config::TLSEndpoint as tls::Endpoint>::Session as CryptoSuite>::InitialKey,
         header_key: <<Config::TLSEndpoint as tls::Endpoint>::Session as CryptoSuite>::InitialHeaderKey,
         now: Timestamp,
-        ack_manager: AckManager,
+        ack_controller: ack::Controller,
     ) -> Self {
         Self {
-            ack_manager,
+            ack_controller,
             key,
             header_key,
             crypto_stream: CryptoStream::new(),
@@ -182,7 +182,7 @@ impl<Config: endpoint::Config> InitialSpace<Config> {
             outcome: &mut outcome,
             packet_number,
             payload: transmission::early::Payload {
-                ack_manager: &mut self.ack_manager,
+                ack_controller: &mut self.ack_controller,
                 crypto_stream: &mut self.crypto_stream,
                 packet_number_space: PacketNumberSpace::Initial,
                 recovery_manager: &mut self.recovery_manager,
@@ -325,7 +325,7 @@ impl<Config: endpoint::Config> InitialSpace<Config> {
         max_pto_backoff: u32,
         publisher: &mut Pub,
     ) {
-        self.ack_manager.on_timeout(timestamp);
+        self.ack_controller.on_timeout(timestamp);
 
         let (recovery_manager, mut context) =
             self.recovery(handshake_status, path_id, path_manager);
@@ -358,7 +358,7 @@ impl<Config: endpoint::Config> InitialSpace<Config> {
 
     /// Returns the Packet Number to be used when decoding incoming packets
     pub fn packet_number_decoder(&self) -> PacketNumber {
-        self.ack_manager.largest_received_packet_number_acked()
+        self.ack_controller.largest_received_packet_number_acked()
     }
 
     /// Returns the Packet Number to be used when encoding outgoing packets
@@ -378,7 +378,7 @@ impl<Config: endpoint::Config> InitialSpace<Config> {
         (
             &mut self.recovery_manager,
             RecoveryContext {
-                ack_manager: &mut self.ack_manager,
+                ack_controller: &mut self.ack_controller,
                 crypto_stream: &mut self.crypto_stream,
                 tx_packet_numbers: &mut self.tx_packet_numbers,
                 handshake_status,
@@ -521,7 +521,7 @@ impl<Config: endpoint::Config> InitialSpace<Config> {
 impl<Config: endpoint::Config> timer::Provider for InitialSpace<Config> {
     #[inline]
     fn timers<Q: timer::Query>(&self, query: &mut Q) -> timer::Result {
-        self.ack_manager.timers(query)?;
+        self.ack_controller.timers(query)?;
         self.recovery_manager.timers(query)?;
 
         Ok(())
@@ -534,7 +534,7 @@ impl<Config: endpoint::Config> transmission::interest::Provider for InitialSpace
         &self,
         query: &mut Q,
     ) -> transmission::interest::Result {
-        self.ack_manager.transmission_interest(query)?;
+        self.ack_controller.transmission_interest(query)?;
         self.crypto_stream.transmission_interest(query)?;
         self.recovery_manager.transmission_interest(query)?;
         Ok(())
@@ -549,7 +549,7 @@ impl<Config: endpoint::Config> connection::finalization::Provider for InitialSpa
 }
 
 struct RecoveryContext<'a, Config: endpoint::Config> {
-    ack_manager: &'a mut AckManager,
+    ack_controller: &'a mut ack::Controller,
     crypto_stream: &'a mut CryptoStream,
     tx_packet_numbers: &'a mut TxPacketNumbers,
     handshake_status: &'a HandshakeStatus,
@@ -615,7 +615,7 @@ impl<'a, Config: endpoint::Config> recovery::Context<Config> for RecoveryContext
     }
 
     fn on_packet_ack(&mut self, timestamp: Timestamp, packet_number_range: &PacketNumberRange) {
-        self.ack_manager
+        self.ack_controller
             .on_packet_ack(timestamp, packet_number_range);
     }
 
@@ -625,7 +625,7 @@ impl<'a, Config: endpoint::Config> recovery::Context<Config> for RecoveryContext
         _publisher: &mut Pub,
     ) {
         self.crypto_stream.on_packet_loss(packet_number_range);
-        self.ack_manager.on_packet_loss(packet_number_range);
+        self.ack_controller.on_packet_loss(packet_number_range);
     }
 
     fn on_rtt_update(&mut self, _now: Timestamp) {}
@@ -729,12 +729,12 @@ impl<Config: endpoint::Config> PacketSpace<Config> for InitialSpace<Config> {
 
     fn on_processed_packet<Pub: event::ConnectionPublisher>(
         &mut self,
-        processed_packet: ProcessedPacket,
+        processed_packet: packet::processed::Outcome,
         path_id: path::Id,
         path: &Path<Config>,
         publisher: &mut Pub,
     ) -> Result<(), transport::Error> {
-        self.ack_manager.on_processed_packet(
+        self.ack_controller.on_processed_packet(
             &processed_packet,
             path_event!(path, path_id),
             publisher,

@@ -1,11 +1,13 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::contexts::testing::{MockWriteContext, OutgoingFrameBuffer};
-use s2n_quic_core::{
+use crate::{
     endpoint,
     time::{clock::testing as time, Timestamp},
-    transmission,
+    transmission::{
+        self,
+        writer::testing::{OutgoingFrameBuffer, Writer as MockWriteContext},
+    },
 };
 
 #[derive(Clone, Debug)]

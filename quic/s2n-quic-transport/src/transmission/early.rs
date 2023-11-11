@@ -1,14 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    ack::AckManager, contexts::WriteContext, endpoint, recovery, space::CryptoStream, transmission,
-};
+use crate::{ack, contexts::WriteContext, endpoint, recovery, space::CryptoStream, transmission};
 use core::ops::RangeInclusive;
 use s2n_quic_core::packet::number::PacketNumberSpace;
 
 pub struct Payload<'a, Config: endpoint::Config> {
-    pub ack_manager: &'a mut AckManager,
+    pub ack_controller: &'a mut ack::Controller,
     pub crypto_stream: &'a mut CryptoStream,
     pub packet_number_space: PacketNumberSpace,
     pub recovery_manager: &'a mut recovery::Manager<Config>,
@@ -30,7 +28,7 @@ impl<'a, Config: endpoint::Config> super::Payload for Payload<'a, Config> {
             "Early transmissions should not be used for MTU probing"
         );
 
-        let did_send_ack = self.ack_manager.on_transmit(context);
+        let did_send_ack = self.ack_controller.on_transmit(context);
 
         // Payloads can only transmit and retransmit
         if context.transmission_constraint().can_transmit()
@@ -45,7 +43,7 @@ impl<'a, Config: endpoint::Config> super::Payload for Payload<'a, Config> {
 
         if did_send_ack {
             // inform the ack manager the packet is populated
-            self.ack_manager.on_transmit_complete(context);
+            self.ack_controller.on_transmit_complete(context);
         }
     }
 
@@ -59,7 +57,7 @@ impl<'a, Config: endpoint::Config> transmission::interest::Provider for Payload<
         &self,
         query: &mut Q,
     ) -> transmission::interest::Result {
-        self.ack_manager.transmission_interest(query)?;
+        self.ack_controller.transmission_interest(query)?;
         self.crypto_stream.transmission_interest(query)?;
         self.recovery_manager.transmission_interest(query)?;
         Ok(())

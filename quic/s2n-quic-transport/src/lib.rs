@@ -7,9 +7,8 @@
 #![deny(unused_must_use)]
 extern crate alloc;
 
-mod ack;
+use s2n_quic_core::ack;
 mod contexts;
-mod processed_packet;
 mod space;
 mod sync;
 mod transmission;

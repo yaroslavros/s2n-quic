@@ -3,41 +3,38 @@
 
 use super::{generator::gen_ack_settings, Packet, TestEnvironment};
 use crate::{
-    ack::ack_manager::AckManager,
-    contexts::WriteContext,
-    path::{path_event, testing::helper_path_server},
-    processed_packet::ProcessedPacket,
-    transmission::interest::Provider,
-};
-use bolero::generator::*;
-use s2n_quic_core::{
     ack, connection, endpoint, event,
     event::{testing::Publisher, IntoEvent as _},
     frame::{ack_elicitation::AckElicitation, Ack, Frame, Ping},
     inet::DatagramInfo,
-    packet::number::PacketNumberSpace,
+    packet::{number::PacketNumberSpace, processed::Outcome as ProcessedPacket},
     path,
+    path::{path_event, testing::helper_path_server},
     time::{timer::Provider as _, Timestamp},
+    transmission::{interest::Provider, Provider as _, Writer as _},
 };
+use bolero::generator::*;
+
+pub use endpoint::Type;
 
 #[derive(Clone, Debug, TypeGenerator)]
 pub struct Endpoint {
     #[generator(constant(TestEnvironment::new()))]
     pub env: TestEnvironment,
 
-    #[generator(gen_ack_settings().map_gen(new_ack_manager))]
-    pub ack_manager: AckManager,
+    #[generator(gen_ack_settings().map_gen(new_ack_controller))]
+    pub ack_controller: ack::Controller,
 }
 
-fn new_ack_manager(ack_settings: ack::Settings) -> AckManager {
-    AckManager::new(PacketNumberSpace::ApplicationData, ack_settings)
+fn new_ack_controller(ack_settings: ack::Settings) -> ack::Controller {
+    ack::Controller::new(PacketNumberSpace::ApplicationData, ack_settings)
 }
 
 impl Endpoint {
     pub fn new(ack_settings: ack::Settings) -> Self {
         Self {
             env: TestEnvironment::new(),
-            ack_manager: new_ack_manager(ack_settings),
+            ack_controller: new_ack_controller(ack_settings),
         }
     }
 
@@ -49,7 +46,7 @@ impl Endpoint {
     pub fn recv(&mut self, packet: Packet) {
         self.env.current_time = packet.time;
 
-        self.ack_manager.on_timeout(self.env.current_time);
+        self.ack_controller.on_timeout(self.env.current_time);
 
         let datagram = DatagramInfo {
             ecn: packet.ecn,
@@ -62,7 +59,7 @@ impl Endpoint {
 
         if let Some(ack) = packet.ack {
             for ack_range in ack.ack_ranges {
-                self.ack_manager
+                self.ack_controller
                     .on_packet_ack(datagram.timestamp, &ack_range);
             }
         }
@@ -79,7 +76,7 @@ impl Endpoint {
 
         let path = helper_path_server();
         let path_id = path::Id::test_id();
-        self.ack_manager.on_processed_packet(
+        self.ack_controller.on_processed_packet(
             &packet,
             path_event!(path, path_id),
             &mut Publisher::no_snapshot(),
@@ -88,15 +85,15 @@ impl Endpoint {
 
     pub fn send(&mut self, now: Timestamp) -> Option<Packet> {
         self.env.current_time = now;
-        self.ack_manager.on_timeout(now);
+        self.ack_controller.on_timeout(now);
         self.transmit(AckElicitation::Eliciting)
     }
 
     pub fn tick(&mut self, now: Timestamp) -> Option<Packet> {
         self.env.current_time = now;
-        self.ack_manager.on_timeout(now);
+        self.ack_controller.on_timeout(now);
 
-        if !self.ack_manager.has_transmission_interest() {
+        if !self.ack_controller.has_transmission_interest() {
             return None;
         }
 
@@ -104,19 +101,19 @@ impl Endpoint {
     }
 
     pub fn timers(&self) -> impl Iterator<Item = Timestamp> {
-        self.ack_manager.next_expiration().into_iter()
+        self.ack_controller.next_expiration().into_iter()
     }
 
     fn transmit(&mut self, ack_elicitation: AckElicitation) -> Option<Packet> {
         let mut context = self.env.context();
-        let did_send_ack = self.ack_manager.on_transmit(&mut context);
+        let did_send_ack = self.ack_controller.on_transmit(&mut context);
 
         if ack_elicitation.is_ack_eliciting() {
             context.write_frame(&Ping);
         }
 
         if did_send_ack {
-            self.ack_manager.on_transmit_complete(&mut context);
+            self.ack_controller.on_transmit_complete(&mut context);
         }
 
         let ack_elicitation = context.ack_elicitation();
@@ -162,7 +159,7 @@ impl Endpoint {
 
     pub fn done(&mut self) {
         assert!(
-            !self.ack_manager.has_transmission_interest(),
+            !self.ack_controller.has_transmission_interest(),
             "ack manager should be in a stable state"
         );
     }

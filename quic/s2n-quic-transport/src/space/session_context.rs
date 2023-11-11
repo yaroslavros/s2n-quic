@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ack::AckManager,
     connection::{self, limits::Limits},
     endpoint, path,
     space::{
@@ -313,7 +312,7 @@ impl<'a, Config: endpoint::Config, Pub: event::ConnectionPublisher>
             space.crypto_stream.finish()?;
         }
 
-        let ack_manager = AckManager::new(PacketNumberSpace::Handshake, ack::Settings::EARLY);
+        let ack_manager = ack::Controller::new(PacketNumberSpace::Handshake, ack::Settings::EARLY);
 
         let cipher_suite = key.cipher_suite().into_event();
         *self.handshake = Some(Box::new(HandshakeSpace::new(
@@ -390,7 +389,7 @@ impl<'a, Config: endpoint::Config, Pub: event::ConnectionPublisher>
             self.path_manager.active_path().rtt_estimator.min_rtt(),
         );
 
-        let ack_manager = AckManager::new(
+        let ack_manager = ack::Controller::new(
             PacketNumberSpace::ApplicationData,
             self.limits.ack_settings(),
         );

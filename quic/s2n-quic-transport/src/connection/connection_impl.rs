@@ -17,7 +17,6 @@ use crate::{
     contexts::{ConnectionApiCallContext, ConnectionOnTransmitError},
     endpoint,
     path::{self, path_event},
-    processed_packet::ProcessedPacket,
     recovery::{recovery_event, RttEstimator},
     space::{PacketSpace, PacketSpaceManager},
     stream::{self, Manager as _},
@@ -46,6 +45,7 @@ use s2n_quic_core::{
     inet::{DatagramInfo, SocketAddress},
     io::tx,
     packet::{
+        self,
         handshake::ProtectedHandshake,
         initial::{CleartextInitial, ProtectedInitial},
         number::PacketNumberSpace,
@@ -358,7 +358,7 @@ impl<Config: endpoint::Config> ConnectionImpl<Config> {
 
     fn on_processed_packet(
         &mut self,
-        packet: &ProcessedPacket,
+        packet: &packet::processed::Outcome,
         subscriber: &mut Config::EventSubscriber,
     ) -> Result<(), connection::Error> {
         //= https://www.rfc-editor.org/rfc/rfc9000#section-10.1

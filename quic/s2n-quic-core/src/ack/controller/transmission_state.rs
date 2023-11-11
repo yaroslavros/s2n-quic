@@ -1,11 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transmission;
-use s2n_quic_core::ack;
+use crate::{ack, transmission};
 
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
-pub enum AckTransmissionState {
+pub enum State {
     /// No ACK frames will be transmitted
     #[default]
     Disabled,
@@ -26,13 +25,15 @@ pub enum AckTransmissionState {
     },
 }
 
-impl AckTransmissionState {
+impl State {
     /// Returns `true` if the state is set to `Active`
+    #[inline]
     pub fn is_active(&self) -> bool {
         matches!(self, Self::Active { .. })
     }
 
     /// Returns `true` if ACK frames should be transmitted, either actively or passively
+    #[inline]
     pub fn should_transmit(
         &self,
         constraint: transmission::Constraint,
@@ -56,19 +57,21 @@ impl AckTransmissionState {
     }
 
     /// Transitions the transmission to active if there are pending retransmissions
+    #[inline]
     pub fn activate(&mut self) -> &mut Self {
         if let Self::Passive { retransmissions } = *self {
-            *self = AckTransmissionState::Active { retransmissions }
+            *self = Self::Active { retransmissions }
         }
 
         self
     }
 
     /// Notify the transmission state that pending ack ranges has updated
+    #[inline]
     pub fn on_update(&mut self, ack_ranges: &ack::Ranges) -> &mut Self {
         // no need to transmit anything now
         if ack_ranges.is_empty() {
-            *self = AckTransmissionState::Disabled;
+            *self = Self::Disabled;
             return self;
         }
 
@@ -113,7 +116,7 @@ impl AckTransmissionState {
                 *retransmissions = new_retransmissions;
             }
             Self::Disabled => {
-                *self = AckTransmissionState::Passive {
+                *self = Self::Passive {
                     retransmissions: new_retransmissions,
                 };
             }
@@ -132,9 +135,9 @@ impl AckTransmissionState {
         match *self {
             Self::Active { retransmissions } | Self::Passive { retransmissions } => {
                 if let Some(retransmissions) = retransmissions.checked_sub(1) {
-                    *self = AckTransmissionState::Passive { retransmissions };
+                    *self = Self::Passive { retransmissions };
                 } else {
-                    *self = AckTransmissionState::Disabled;
+                    *self = Self::Disabled;
                 }
             }
             Self::Disabled => {
@@ -149,7 +152,7 @@ impl AckTransmissionState {
     }
 }
 
-impl transmission::interest::Provider for AckTransmissionState {
+impl transmission::interest::Provider for State {
     #[inline]
     fn transmission_interest<Q: transmission::interest::Query>(
         &self,
@@ -175,9 +178,9 @@ mod tests {
     fn should_transmit_test() {
         let mut results = vec![];
         for state in &[
-            AckTransmissionState::Disabled,
-            AckTransmissionState::Passive { retransmissions: 1 },
-            AckTransmissionState::Active { retransmissions: 1 },
+            State::Disabled,
+            State::Passive { retransmissions: 1 },
+            State::Active { retransmissions: 1 },
         ] {
             for constraint in &[
                 transmission::Constraint::None,
@@ -211,19 +214,15 @@ mod tests {
     #[test]
     fn activate_test() {
         assert!(
-            !AckTransmissionState::Disabled.activate().is_active(),
+            !State::Disabled.activate().is_active(),
             "disabled state should not activate"
         );
         assert!(
-            AckTransmissionState::Passive { retransmissions: 1 }
-                .activate()
-                .is_active(),
+            State::Passive { retransmissions: 1 }.activate().is_active(),
             "passive state should activate"
         );
         assert!(
-            AckTransmissionState::Active { retransmissions: 1 }
-                .activate()
-                .is_active(),
+            State::Active { retransmissions: 1 }.activate().is_active(),
             "active state should activate"
         );
     }
@@ -231,26 +230,26 @@ mod tests {
     #[test]
     #[should_panic]
     fn disabled_transmission_test() {
-        AckTransmissionState::Disabled.on_transmit(false);
+        State::Disabled.on_transmit(false);
     }
 
     #[test]
     fn transmission_test() {
         assert_eq!(
-            *AckTransmissionState::Passive { retransmissions: 0 }.on_transmit(true),
-            AckTransmissionState::Disabled,
+            *State::Passive { retransmissions: 0 }.on_transmit(true),
+            State::Disabled,
             "transmitting should transition to Disabled"
         );
 
         assert_eq!(
-            *AckTransmissionState::Passive { retransmissions: 1 }.on_transmit(true),
-            AckTransmissionState::Passive { retransmissions: 0 },
+            *State::Passive { retransmissions: 1 }.on_transmit(true),
+            State::Passive { retransmissions: 0 },
             "transmitting should decrement and stay in the same state"
         );
 
         assert_eq!(
-            *AckTransmissionState::Disabled.on_transmit(true),
-            AckTransmissionState::Disabled,
+            *State::Disabled.on_transmit(true),
+            State::Disabled,
             "transmitting when disabled should continue to be disabled"
         );
     }
@@ -261,8 +260,8 @@ mod tests {
         let mut packet_numbers = packet_numbers_iter().step_by(2); // skip every other packet number
 
         assert_eq!(
-            *AckTransmissionState::Passive { retransmissions: 1 }.on_update(&ack_ranges),
-            AckTransmissionState::Disabled,
+            *State::Passive { retransmissions: 1 }.on_update(&ack_ranges),
+            State::Disabled,
             "empty ack_ranges should transition to Disabled"
         );
 
@@ -271,8 +270,8 @@ mod tests {
             .is_ok());
 
         assert_eq!(
-            *AckTransmissionState::Disabled.on_update(&ack_ranges),
-            AckTransmissionState::Passive { retransmissions: 0 },
+            *State::Disabled.on_update(&ack_ranges),
+            State::Passive { retransmissions: 0 },
             "one ack range should transition to passive"
         );
 
@@ -284,20 +283,20 @@ mod tests {
             .is_ok());
 
         assert_eq!(
-            *AckTransmissionState::Disabled.on_update(&ack_ranges),
-            AckTransmissionState::Passive { retransmissions: 1 },
+            *State::Disabled.on_update(&ack_ranges),
+            State::Passive { retransmissions: 1 },
             "multiple ack ranges should transition to passive with retransmissions"
         );
 
         assert_eq!(
-            *AckTransmissionState::Passive { retransmissions: 0 }.on_update(&ack_ranges),
-            AckTransmissionState::Passive { retransmissions: 1 },
+            *State::Passive { retransmissions: 0 }.on_update(&ack_ranges),
+            State::Passive { retransmissions: 1 },
             "multiple ack ranges should update passive with retransmissions"
         );
 
         assert_eq!(
-            *AckTransmissionState::Active { retransmissions: 0 }.on_update(&ack_ranges),
-            AckTransmissionState::Active { retransmissions: 1 },
+            *State::Active { retransmissions: 0 }.on_update(&ack_ranges),
+            State::Active { retransmissions: 1 },
             "multiple ack ranges should update active with retransmissions"
         );
     }
@@ -308,6 +307,6 @@ mod tests {
         use core::mem::size_of;
         use insta::assert_debug_snapshot;
 
-        assert_debug_snapshot!("AckTransmissionState", size_of::<AckTransmissionState>());
+        assert_debug_snapshot!("ack_transmission::State", size_of::<State>());
     }
 }

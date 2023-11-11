@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{generator::gen_duration, Endpoint, Packet};
+use crate::{endpoint, time::Timestamp};
 use alloc::collections::VecDeque;
 use bolero::generator::*;
 use core::time::Duration;
-use s2n_quic_core::{endpoint, time::Timestamp};
 
 #[derive(Clone, Debug, TypeGenerator)]
 pub struct Application {

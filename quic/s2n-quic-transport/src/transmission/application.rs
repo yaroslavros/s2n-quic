@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ack::AckManager,
-    connection,
+    ack, connection,
     contexts::WriteContext,
     endpoint, path,
     path::mtu,
@@ -32,7 +31,7 @@ impl<'a, Config: endpoint::Config> Payload<'a, Config> {
         path_manager: &'a mut path::Manager<Config>,
         local_id_registry: &'a mut connection::LocalIdRegistry,
         transmission_mode: transmission::Mode,
-        ack_manager: &'a mut AckManager,
+        ack_controller: &'a mut ack::Controller,
         handshake_status: &'a mut HandshakeStatus,
         ping: &'a mut flag::Ping,
         stream_manager: &'a mut Config::StreamManager,
@@ -47,7 +46,7 @@ impl<'a, Config: endpoint::Config> Payload<'a, Config> {
         match transmission_mode {
             Mode::LossRecoveryProbing | Mode::Normal => {
                 transmission::application::Payload::Normal(Normal {
-                    ack_manager,
+                    ack_controller,
                     handshake_status,
                     ping,
                     stream_manager,
@@ -104,7 +103,7 @@ impl<'a, Config: endpoint::Config> transmission::interest::Provider for Payload<
 }
 
 pub struct Normal<'a, Config: endpoint::Config> {
-    ack_manager: &'a mut AckManager,
+    ack_controller: &'a mut ack::Controller,
     handshake_status: &'a mut HandshakeStatus,
     ping: &'a mut Ping,
     stream_manager: &'a mut Config::StreamManager,
@@ -135,7 +134,7 @@ impl<'a, Config: endpoint::Config> Normal<'a, Config> {
                 self.prioritize_datagrams,
             );
         }
-        let did_send_ack = self.ack_manager.on_transmit(context);
+        let did_send_ack = self.ack_controller.on_transmit(context);
 
         // Payloads can only transmit and retransmit
         if can_transmit {
@@ -164,7 +163,7 @@ impl<'a, Config: endpoint::Config> Normal<'a, Config> {
 
         if did_send_ack {
             // inform the ack manager the packet is populated
-            self.ack_manager.on_transmit_complete(context);
+            self.ack_controller.on_transmit_complete(context);
         }
 
         // Alternate between prioritizing datagrams or not each packet
@@ -196,7 +195,7 @@ impl<'a, Config: endpoint::Config> transmission::interest::Provider for Normal<'
         &self,
         query: &mut Q,
     ) -> transmission::interest::Result {
-        self.ack_manager.transmission_interest(query)?;
+        self.ack_controller.transmission_interest(query)?;
         self.handshake_status.transmission_interest(query)?;
         self.stream_manager.transmission_interest(query)?;
         self.datagram_manager.transmission_interest(query)?;

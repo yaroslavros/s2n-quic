@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ack::AckManager,
+    ack,
     connection::{self, ConnectionTransmissionContext, ProcessingError},
     endpoint, path,
     path::{path_event, Path},
-    processed_packet::ProcessedPacket,
     recovery,
     recovery::CongestionController,
     space::{
@@ -33,6 +32,7 @@ use s2n_quic_core::{
     },
     inet::DatagramInfo,
     packet::{
+        self,
         encoding::{PacketEncoder, PacketEncodingError},
         number::{PacketNumber, PacketNumberRange, PacketNumberSpace, SlidingWindow},
         short::{CleartextShort, ProtectedShort, Short, SpinBit},
@@ -51,7 +51,7 @@ pub struct ApplicationSpace<Config: endpoint::Config> {
     /// Transmission Packet numbers
     pub tx_packet_numbers: TxPacketNumbers,
     /// Ack manager
-    pub ack_manager: AckManager,
+    pub ack_controller: ack::Controller,
     /// All streams that are managed through this connection
     pub stream_manager: Config::StreamManager,
     /// The current state of the Spin bit
@@ -82,7 +82,7 @@ pub struct ApplicationSpace<Config: endpoint::Config> {
 impl<Config: endpoint::Config> fmt::Debug for ApplicationSpace<Config> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ApplicationSpace")
-            .field("ack_manager", &self.ack_manager)
+            .field("ack_controller", &self.ack_controller)
             .field("ping", &self.ping)
             .field("processed_packet_numbers", &self.processed_packet_numbers)
             .field("recovery_manager", &self.recovery_manager)
@@ -99,7 +99,7 @@ impl<Config: endpoint::Config> ApplicationSpace<Config> {
         header_key: <<Config::TLSEndpoint as tls::Endpoint>::Session as CryptoSuite>::OneRttHeaderKey,
         now: Timestamp,
         stream_manager: Config::StreamManager,
-        ack_manager: AckManager,
+        ack_controller: ack::Controller,
         keep_alive: KeepAlive,
         max_mtu: MaxMtu,
         datagram_manager: datagram::Manager<Config>,
@@ -108,7 +108,7 @@ impl<Config: endpoint::Config> ApplicationSpace<Config> {
 
         Self {
             tx_packet_numbers: TxPacketNumbers::new(PacketNumberSpace::ApplicationData, now),
-            ack_manager,
+            ack_controller,
             spin_bit: SpinBit::Zero,
             stream_manager,
             crypto_stream: CryptoStream::new(),
@@ -212,7 +212,7 @@ impl<Config: endpoint::Config> ApplicationSpace<Config> {
                 context.path_manager,
                 context.local_id_registry,
                 context.transmission_mode,
-                &mut self.ack_manager,
+                &mut self.ack_controller,
                 handshake_status,
                 &mut self.ping,
                 &mut self.stream_manager,
@@ -461,7 +461,7 @@ impl<Config: endpoint::Config> ApplicationSpace<Config> {
         max_pto_backoff: u32,
         publisher: &mut Pub,
     ) {
-        self.ack_manager.on_timeout(timestamp);
+        self.ack_controller.on_timeout(timestamp);
         self.key_set.on_timeout(timestamp);
 
         let (recovery_manager, mut context) = self.recovery(
@@ -561,7 +561,7 @@ impl<Config: endpoint::Config> ApplicationSpace<Config> {
         (
             &mut self.recovery_manager,
             RecoveryContext {
-                ack_manager: &mut self.ack_manager,
+                ack_controller: &mut self.ack_controller,
                 crypto_stream: &mut self.crypto_stream,
                 handshake_status,
                 ping: &mut self.ping,
@@ -591,7 +591,7 @@ impl<Config: endpoint::Config> ApplicationSpace<Config> {
         path: &path::Path<Config>,
         publisher: &mut Pub,
     ) -> Result<CleartextShort<'a>, ProcessingError> {
-        let largest_acked = self.ack_manager.largest_received_packet_number_acked();
+        let largest_acked = self.ack_controller.largest_received_packet_number_acked();
         let packet = protected
             .unprotect(&self.header_key, largest_acked)
             .map_err(|err| {
@@ -698,7 +698,7 @@ impl<Config: endpoint::Config> ApplicationSpace<Config> {
 impl<Config: endpoint::Config> timer::Provider for ApplicationSpace<Config> {
     #[inline]
     fn timers<Q: timer::Query>(&self, query: &mut Q) -> timer::Result {
-        self.ack_manager.timers(query)?;
+        self.ack_controller.timers(query)?;
         self.recovery_manager.timers(query)?;
         self.key_set.timers(query)?;
         self.stream_manager.timers(query)?;
@@ -714,7 +714,7 @@ impl<Config: endpoint::Config> transmission::interest::Provider for ApplicationS
         &self,
         query: &mut Q,
     ) -> transmission::interest::Result {
-        self.ack_manager.transmission_interest(query)?;
+        self.ack_controller.transmission_interest(query)?;
         self.ping.transmission_interest(query)?;
         self.crypto_stream.transmission_interest(query)?;
         self.recovery_manager.transmission_interest(query)?;
@@ -731,7 +731,7 @@ impl<Config: endpoint::Config> connection::finalization::Provider for Applicatio
 }
 
 struct RecoveryContext<'a, Config: endpoint::Config> {
-    ack_manager: &'a mut AckManager,
+    ack_controller: &'a mut ack::Controller,
     handshake_status: &'a mut HandshakeStatus,
     crypto_stream: &'a mut CryptoStream,
     ping: &'a mut flag::Ping,
@@ -805,7 +805,7 @@ impl<'a, Config: endpoint::Config> recovery::Context<Config> for RecoveryContext
     }
 
     fn on_packet_ack(&mut self, timestamp: Timestamp, packet_number_range: &PacketNumberRange) {
-        self.ack_manager
+        self.ack_controller
             .on_packet_ack(timestamp, packet_number_range);
     }
 
@@ -814,7 +814,7 @@ impl<'a, Config: endpoint::Config> recovery::Context<Config> for RecoveryContext
         packet_number_range: &PacketNumberRange,
         publisher: &mut Pub,
     ) {
-        self.ack_manager.on_packet_loss(packet_number_range);
+        self.ack_controller.on_packet_loss(packet_number_range);
         self.crypto_stream.on_packet_loss(packet_number_range);
         self.handshake_status
             .on_packet_loss(packet_number_range, publisher);
@@ -917,7 +917,7 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
     fn handle_stream_frame(
         &mut self,
         frame: StreamRef,
-        packet: &mut ProcessedPacket,
+        packet: &mut packet::processed::Outcome,
     ) -> Result<(), transport::Error> {
         let bytes_progressed = self.stream_manager.incoming_bytes_progressed();
 
@@ -1129,12 +1129,12 @@ impl<Config: endpoint::Config> PacketSpace<Config> for ApplicationSpace<Config> 
 
     fn on_processed_packet<Pub: event::ConnectionPublisher>(
         &mut self,
-        processed_packet: ProcessedPacket,
+        processed_packet: packet::processed::Outcome,
         path_id: path::Id,
         path: &Path<Config>,
         publisher: &mut Pub,
     ) -> Result<(), transport::Error> {
-        self.ack_manager.on_processed_packet(
+        self.ack_controller.on_processed_packet(
             &processed_packet,
             path_event!(path, path_id),
             publisher,

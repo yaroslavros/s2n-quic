@@ -24,6 +24,7 @@ pub mod encoding;
 pub mod interceptor;
 pub mod key_phase;
 pub mod long;
+pub mod processed;
 
 pub mod number;
 pub mod stateless_reset;

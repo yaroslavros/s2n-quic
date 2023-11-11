@@ -5,9 +5,9 @@ use super::{
     generator::{gen_duration, gen_ecn},
     EndpointReport, Packet,
 };
+use crate::inet::ExplicitCongestionNotification;
 use bolero::generator::*;
 use core::time::Duration;
-use s2n_quic_core::inet::ExplicitCongestionNotification;
 
 #[derive(Clone, Copy, Debug, TypeGenerator)]
 pub enum NetworkEvent {

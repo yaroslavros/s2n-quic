@@ -1,14 +1,14 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-use alloc::collections::VecDeque;
-use core::ops::RangeInclusive;
-use s2n_quic_core::{
+use crate::{
     frame::{ack_elicitation::AckElicitation, Ack},
     inet::ExplicitCongestionNotification,
     packet::number::PacketNumber,
     time::Timestamp,
 };
+use alloc::collections::VecDeque;
+use core::ops::RangeInclusive;
 
 #[derive(Clone, Debug)]
 pub struct Packet {

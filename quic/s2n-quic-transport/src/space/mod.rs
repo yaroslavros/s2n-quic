@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ack,
-    ack::AckManager,
-    connection, endpoint, path,
+    ack, connection, endpoint, path,
     path::{path_event, Path},
-    processed_packet::ProcessedPacket,
     stream::Manager as _,
     transmission,
 };
@@ -28,7 +25,10 @@ use s2n_quic_core::{
         StopSending, StreamDataBlocked, StreamsBlocked,
     },
     inet::DatagramInfo,
-    packet::number::{PacketNumber, PacketNumberSpace},
+    packet::{
+        self,
+        number::{PacketNumber, PacketNumberSpace},
+    },
     time::{timer, Timestamp},
     transport,
 };
@@ -111,7 +111,7 @@ impl<Config: endpoint::Config> PacketSpaceManager<Config> {
         now: Timestamp,
         publisher: &mut Pub,
     ) -> Self {
-        let ack_manager = AckManager::new(PacketNumberSpace::Initial, ack::Settings::EARLY);
+        let ack_controller = ack::Controller::new(PacketNumberSpace::Initial, ack::Settings::EARLY);
 
         publisher.on_key_update(event::builder::KeyUpdate {
             key_type: event::builder::KeyType::Initial,
@@ -127,7 +127,7 @@ impl<Config: endpoint::Config> PacketSpaceManager<Config> {
                 initial_key,
                 header_key,
                 now,
-                ack_manager,
+                ack_controller,
             ))),
             handshake: None,
             application: None,
@@ -714,7 +714,7 @@ pub trait PacketSpace<Config: endpoint::Config> {
     fn handle_stream_frame(
         &mut self,
         frame: StreamRef,
-        _packet: &mut ProcessedPacket,
+        _packet: &mut packet::processed::Outcome,
     ) -> Result<(), transport::Error> {
         Err(transport::Error::PROTOCOL_VIOLATION
             .with_reason(Self::INVALID_FRAME_ERROR)
@@ -743,7 +743,7 @@ pub trait PacketSpace<Config: endpoint::Config> {
 
     fn on_processed_packet<Pub: event::ConnectionPublisher>(
         &mut self,
-        processed_packet: ProcessedPacket,
+        processed_packet: packet::processed::Outcome,
         path_id: path::Id,
         path: &Path<Config>,
         publisher: &mut Pub,
@@ -763,7 +763,7 @@ pub trait PacketSpace<Config: endpoint::Config> {
         random_generator: &mut Config::RandomGenerator,
         publisher: &mut Pub,
         packet_interceptor: &mut Config::PacketInterceptor,
-    ) -> Result<ProcessedPacket<'a>, connection::Error> {
+    ) -> Result<packet::processed::Outcome<'a>, connection::Error> {
         use s2n_quic_core::{
             frame::{Frame, FrameMut},
             varint::VarInt,
@@ -783,7 +783,7 @@ pub trait PacketSpace<Config: endpoint::Config> {
             )
         };
 
-        let mut processed_packet = ProcessedPacket::new(packet_number, datagram);
+        let mut processed_packet = packet::processed::Outcome::new(packet_number, datagram);
 
         macro_rules! on_frame_processed {
             ($frame:ident) => {{

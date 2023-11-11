@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{NetworkEvent, NetworkInterface, Report};
+use crate::{endpoint, time::Timestamp};
 use bolero::generator::*;
 use core::time::Duration;
-use s2n_quic_core::{endpoint, time::Timestamp};
 
 #[derive(Clone, Debug, TypeGenerator)]
 pub struct Network {

@@ -1,9 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{ack, inet::ExplicitCongestionNotification};
 use bolero::generator::*;
 use core::time::Duration;
-use s2n_quic_core::{ack, inet::ExplicitCongestionNotification};
 
 pub fn gen_ack_settings() -> impl ValueGenerator<Output = ack::Settings> {
     (gen_duration(), 0..20).map_gen(|(max_ack_delay, ack_delay_exponent)| ack::Settings {
