@@ -1,12 +1,14 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::ring::rand::SystemRandom;
+use crate::ring::signature::{EcdsaKeyPair, self};
+// use openssl::{ec::EcKey, ecdsa::EcdsaSig};
 use crate::{certificate, client, server};
 use core::{
     sync::atomic::{AtomicBool, AtomicU8, Ordering},
     task::Poll,
 };
-use openssl::{ec::EcKey, ecdsa::EcdsaSig};
 use pin_project::pin_project;
 use s2n_quic_core::{
     crypto::tls::{
@@ -141,10 +143,16 @@ impl ConnectionFuture for MyPrivateKeyFuture {
         let mut in_buf = vec![0; in_buf_size];
         op.input(&mut in_buf)?;
 
-        let key = EcKey::private_key_from_pem(KEY_PEM.as_bytes())
-            .expect("Failed to create EcKey from pem");
-        let sig = EcdsaSig::sign(&in_buf, &key).expect("Failed to sign input");
-        let out = sig.to_der().expect("Failed to convert signature to der");
+        let rand = SystemRandom::new();
+        let key = EcdsaKeyPair::from_pkcs8(&signature::ECDSA_P256_SHA256_FIXED_SIGNING, KEY_PEM.as_bytes())
+            .expect("Failed to create key from pem");
+        let sig = key.sign(&rand, &in_buf).expect("Failed to sign input");
+        let out = sig.as_ref();
+
+        // let key = EcKey::private_key_from_pem(KEY_PEM.as_bytes())
+        //     .expect("Failed to create EcKey from pem");
+        // let sig = EcdsaSig::sign(&in_buf, &key).expect("Failed to sign input");
+        // let out = sig.to_der().expect("Failed to convert signature to der");
 
         op.set_output(conn, &out)?;
         Poll::Ready(Ok(()))
