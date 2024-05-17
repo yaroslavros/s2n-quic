@@ -144,8 +144,9 @@ impl ConnectionFuture for MyPrivateKeyFuture {
         op.input(&mut in_buf)?;
 
         let rand = SystemRandom::new();
-        let key = EcdsaKeyPair::from_pkcs8(&signature::ECDSA_P256_SHA256_FIXED_SIGNING, KEY_PEM.as_bytes())
-            .expect("Failed to create key from pem");
+        let der = x509_parser::pem::parse_x509_pem(KEY_PEM.as_bytes()).unwrap();
+        let key = EcdsaKeyPair::from_pkcs8(&signature::ECDSA_P256_SHA256_ASN1_SIGNING, der.0)
+            .expect("THIS FAILS-------Failed to create key from pem");
         let sig = key.sign(&rand, &in_buf).expect("Failed to sign input");
         let out = sig.as_ref();
 
