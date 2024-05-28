@@ -18,8 +18,8 @@ pub struct ConnectionContext<'a> {
     pub server_name: Option<&'a ServerName>,
 }
 
-#[cfg(not(target_os = "windows"))]
-use aws_lc_rs as ring;
+// #[cfg(not(target_os = "windows"))]
+// use aws_lc_rs as ring;
 
 /// Loads a config for a given connection
 ///
