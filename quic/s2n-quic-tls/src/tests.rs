@@ -147,25 +147,25 @@ impl ConnectionFuture for MyPrivateKeyFuture {
 
         // openssl
         let key = openssl::ec::EcKey::private_key_from_pem(KEY_PEM.as_bytes())
-            .expect("Fails for openssl -------- to create EcKey from pem");
+            .expect("SUCCEEDS");
         // let sig = EcdsaSig::sign(&in_buf, &key).expect("Failed to sign input");
         // let out = sig.to_der().expect("Failed to convert signature to der");
 
         // ring
         // first decode pem
-        // let der = x509_parser::pem::parse_x509_pem(KEY_PEM.as_bytes()).expect("FAILED to parse pem");
+        let der = x509_parser::pem::parse_x509_pem(KEY_PEM.as_bytes()).expect("SUCCEEDS");
         // let key = EcdsaKeyPair::from_pkcs8(&signature::ECDSA_P256_SHA256_ASN1_SIGNING, der.0)
-        //     .expect("THIS FAILS-------Failed to create key from pem");
+        //     .expect("FAILS------- to create key from pem");
 
         // use raw bytes
         // let key = EcdsaKeyPair::from_pkcs8(&signature::ECDSA_P256_SHA256_FIXED_SIGNING, KEY_PEM.as_bytes())
-        //     .expect("Fails here ------- to create ECDSA key from pem bytes");
+        //     .expect("FAILS ------- to create ECDSA key from pem bytes");
         let key = EcdsaKeyPair::from_private_key_and_public_key(
             &signature::ECDSA_P256_SHA256_FIXED_SIGNING,
             KEY_PEM.as_bytes(),
             KEY_PUBLIC_PEM.as_bytes(),
         )
-        .expect("Fails here ------- to create ECDSA key from pem bytes");
+        .expect("FAILS here ------- to create ECDSA key from pem bytes");
 
         let rand = SystemRandom::new();
         let sig = key.sign(&rand, &in_buf).expect("Failed to sign input");
