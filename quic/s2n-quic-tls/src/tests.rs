@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use ring::rand::SystemRandom;
-use ring::signature::{EcdsaKeyPair, self};
+use ring::signature::{self, EcdsaKeyPair};
 // use openssl::{ec::EcKey, ecdsa::EcdsaSig};
 use crate::{certificate, client, server};
 use core::{
@@ -13,7 +13,9 @@ use pin_project::pin_project;
 use s2n_quic_core::{
     crypto::tls::{
         self,
-        testing::certificates::{CERT_PEM, KEY_PEM, UNTRUSTED_CERT_PEM, UNTRUSTED_KEY_PEM},
+        testing::certificates::{
+            CERT_PEM, KEY_PEM, KEY_PUBLIC_PEM, UNTRUSTED_CERT_PEM, UNTRUSTED_KEY_PEM,
+        },
         Endpoint,
     },
     transport,
@@ -143,12 +145,11 @@ impl ConnectionFuture for MyPrivateKeyFuture {
         let mut in_buf = vec![0; in_buf_size];
         op.input(&mut in_buf)?;
 
-        // OPENSSL
+        // openssl
         let key = openssl::ec::EcKey::private_key_from_pem(KEY_PEM.as_bytes())
-            .expect("Failed to create EcKey from pem");
+            .expect("Fails for openssl -------- to create EcKey from pem");
         // let sig = EcdsaSig::sign(&in_buf, &key).expect("Failed to sign input");
         // let out = sig.to_der().expect("Failed to convert signature to der");
-
 
         // ring
         // first decode pem
@@ -157,8 +158,14 @@ impl ConnectionFuture for MyPrivateKeyFuture {
         //     .expect("THIS FAILS-------Failed to create key from pem");
 
         // use raw bytes
-         let key = EcdsaKeyPair::from_pkcs8(&signature::ECDSA_P256_SHA256_FIXED_SIGNING, KEY_PEM.as_bytes())
-            .expect("Fails here ------- to create ECDSA key from pem bytes");
+        // let key = EcdsaKeyPair::from_pkcs8(&signature::ECDSA_P256_SHA256_FIXED_SIGNING, KEY_PEM.as_bytes())
+        //     .expect("Fails here ------- to create ECDSA key from pem bytes");
+        let key = EcdsaKeyPair::from_private_key_and_public_key(
+            &signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+            KEY_PEM.as_bytes(),
+            KEY_PUBLIC_PEM.as_bytes(),
+        )
+        .expect("Fails here ------- to create ECDSA key from pem bytes");
 
         let rand = SystemRandom::new();
         let sig = key.sign(&rand, &in_buf).expect("Failed to sign input");
