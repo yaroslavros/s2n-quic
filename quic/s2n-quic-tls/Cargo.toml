@@ -24,6 +24,7 @@ s2n-quic-core = { version = "=0.37.0", path = "../s2n-quic-core", default-featur
 s2n-quic-crypto = { version = "=0.37.0", path = "../s2n-quic-crypto", default-features = false }
 s2n-tls = { version = "0.2", features = ["quic"] }
 ring = { version = "0.16", default-features = false }
+aws-lc-rs = { version = "1.6" }
 
 # [target.'cfg(not(target_os = "windows"))'.dependencies]
 # aws-lc-rs = { version = "1.6" }

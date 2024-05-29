@@ -1,20 +1,19 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-use ring::rand::SystemRandom;
-use ring::signature::{self, EcdsaKeyPair};
-// use openssl::{ec::EcKey, ecdsa::EcdsaSig};
 use crate::{certificate, client, server};
 use core::{
     sync::atomic::{AtomicBool, AtomicU8, Ordering},
     task::Poll,
 };
 use pin_project::pin_project;
+use ring::rand::SystemRandom;
+use ring::signature::{self, EcdsaKeyPair};
 use s2n_quic_core::{
     crypto::tls::{
         self,
         testing::certificates::{
-            CERT_PEM, KEY_PEM, KEY_PUBLIC_PEM, UNTRUSTED_CERT_PEM, UNTRUSTED_KEY_PEM,
+            CERT_PEM, KEY_DER, KEY_PEM, UNTRUSTED_CERT_PEM, UNTRUSTED_KEY_PEM,
         },
         Endpoint,
     },
@@ -146,27 +145,21 @@ impl ConnectionFuture for MyPrivateKeyFuture {
         op.input(&mut in_buf)?;
 
         // openssl
-        let key = openssl::ec::EcKey::private_key_from_pem(KEY_PEM.as_bytes())
-            .expect("SUCCEEDS");
+        // let key = openssl::ec::EcKey::private_key_from_der(KEY_DER)
+        // // let key = openssl::ec::EcKey::private_key_from_pem(KEY_PEM.as_bytes())
+        //     .expect("SUCCEEDS");
         // let sig = EcdsaSig::sign(&in_buf, &key).expect("Failed to sign input");
-        // let out = sig.to_der().expect("Failed to convert signature to der");
+        // let ossl_out = sig.to_der().expect("Failed to convert signature to der");
+        // op.set_output(conn, &ossl_out)?;
+        // Poll::Ready(Ok(()))
 
-        // ring
-        // first decode pem
-        let der = x509_parser::pem::parse_x509_pem(KEY_PEM.as_bytes()).expect("SUCCEEDS");
-        // let key = EcdsaKeyPair::from_pkcs8(&signature::ECDSA_P256_SHA256_ASN1_SIGNING, der.0)
-        //     .expect("FAILS------- to create key from pem");
+        // can verify both using public key
+        //
+        // verify that the client is failing to verify the server signature
 
-        // use raw bytes
-        // let key = EcdsaKeyPair::from_pkcs8(&signature::ECDSA_P256_SHA256_FIXED_SIGNING, KEY_PEM.as_bytes())
-        //     .expect("FAILS ------- to create ECDSA key from pem bytes");
-        let key = EcdsaKeyPair::from_private_key_and_public_key(
-            &signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-            KEY_PEM.as_bytes(),
-            KEY_PUBLIC_PEM.as_bytes(),
-        )
-        .expect("FAILS here ------- to create ECDSA key from pem bytes");
-
+        // PKCS8 =========
+        let key = EcdsaKeyPair::from_pkcs8(&signature::ECDSA_P256_SHA256_ASN1_SIGNING, KEY_DER)
+            .expect("FAILS ------- pkcs8");
         let rand = SystemRandom::new();
         let sig = key.sign(&rand, &in_buf).expect("Failed to sign input");
         let out = sig.as_ref();
