@@ -44,3 +44,46 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+async fn google() {
+  //let ca = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/mozilla-ca-bundle.pem"));
+  //
+    let mut config = tls::s2n_tls::config::Builder::new();
+    config
+       // .trust_pem(ca)? // this works
+         .with_system_certs(true)? // doesn't work
+        .set_application_protocol_preference([b"h3"])?
+        .set_security_policy(&s2n_quic::provider::tls::default::security::DEFAULT_TLS13)?
+        .enable_quic()?;
+
+    // FIXME REMOVE to test with ca.
+    // used to verify that it works without certs
+     unsafe {
+         config.disable_x509_verification()?;
+     }
+
+    let config = config.build()?;
+
+    // FIXME which port does google use?
+    // https://142.250.31.99/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png
+    //let socket_addr: SocketAddr = "142.250.31.99:4433".parse()?;
+    let socket_addr: SocketAddr = "142.250.31.99:443".parse()?;
+    let sni = "google.com";
+
+    let tls = s2n_quic::provider::tls::s2n_tls::Client::from_loader(config);
+    let connect = s2n_quic::client::Connect::new(socket_addr).with_server_name(sni.to_owned());
+
+    let client = s2n_quic::Client::builder()
+        .with_tls(tls)?
+        .with_io("0.0.0.0:0")?
+        .start()
+        .map_err(|e| {
+            stats.add_handshake(false);
+            e
+        })?;
+
+    let connection = client.connect(connect).await.map_err(|e| {
+        stats.add_handshake(false);
+        e
+    })?;
+}
