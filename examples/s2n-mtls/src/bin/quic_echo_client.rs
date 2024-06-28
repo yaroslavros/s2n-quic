@@ -48,19 +48,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 async fn google() {
-    //let ca = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/mozilla-ca-bundle.pem"));
-    //
+    // let ca = include_bytes!(concat!(
+    //     env!("CARGO_MANIFEST_DIR"),
+    //     "/data/mozilla-ca-bundle.pem"
+    // ));
+    let ca = include_bytes!("../../google-com.pem");
+
     let mut config = s2n_tls::config::Builder::new();
     config
-        // .trust_pem(ca)? // this works
-        .with_system_certs(true)
-        .unwrap() // doesn't work
         .set_application_protocol_preference([b"h3"])
         .unwrap()
         .set_security_policy(&s2n_tls::security::DEFAULT_TLS13)
         .unwrap()
         .enable_quic()
         .unwrap();
+
+    // doesn't work
+    // config.with_system_certs(true).unwrap();
+    // config.trust_pem(ca).unwrap(); // this works
 
     // FIXME REMOVE to test with ca.
     // used to verify that it works without certs
@@ -70,16 +75,15 @@ async fn google() {
 
     let config = config.build().unwrap();
 
+    let sni = "google.com";
     // https://142.250.31.99/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png
     // 443 seems to be the QUIC port. `4433` didn't work.
-    let addr = tokio::net::lookup_host("google.com:443")
+    let addr = tokio::net::lookup_host(format!("{sni}:443"))
         .await
         .unwrap()
         .next()
         .unwrap();
     println!("dns resolution: {:?}", addr);
-
-    let sni = "google.com";
 
     let tls = s2n_tls::Client::from_loader(config);
     let connect = s2n_quic::client::Connect::new(addr).with_server_name(sni.to_owned());
