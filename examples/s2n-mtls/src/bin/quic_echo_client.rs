@@ -25,7 +25,7 @@ async fn google() {
         .unwrap();
 
     // DOESN'T WORK: sanity check that not including any CA certs
-    // config.with_system_certs(false).unwrap();
+     //config.with_system_certs(false).unwrap();
     //
     // WORKS: The root cert `../../google-com.pem` is also part of my hosts system cert
     config.with_system_certs(true).unwrap();
@@ -45,7 +45,10 @@ async fn google() {
 
     let config = config.build().unwrap();
 
-    let sni = "google.com";
+    // CF sni: also works when using `with_system_certs(true)`
+    let sni = "dnglbrstg7yg.cloudfront.net";
+    //let sni = "google.com";
+    //
     // https://142.250.31.99/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png
     // 443 seems to be the QUIC port. `4433` didn't work.
     let addr = tokio::net::lookup_host(format!("{sni}:443"))
