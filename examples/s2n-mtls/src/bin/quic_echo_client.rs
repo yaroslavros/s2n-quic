@@ -70,14 +70,19 @@ async fn google() {
 
     let config = config.build().unwrap();
 
-    // FIXME which port does google use?
     // https://142.250.31.99/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png
-    //let socket_addr: SocketAddr = "142.250.31.99:4433".parse().unwrap();
-    let socket_addr: SocketAddr = "142.250.31.99:443".parse().unwrap();
+    // 443 seems to be the QUIC port. `4433` didn't work.
+    let addr = tokio::net::lookup_host("google.com:443")
+        .await
+        .unwrap()
+        .next()
+        .unwrap();
+    println!("dns resolution: {:?}", addr);
+
     let sni = "google.com";
 
     let tls = s2n_tls::Client::from_loader(config);
-    let connect = s2n_quic::client::Connect::new(socket_addr).with_server_name(sni.to_owned());
+    let connect = s2n_quic::client::Connect::new(addr).with_server_name(sni.to_owned());
 
     let client = s2n_quic::Client::builder()
         .with_tls(tls)
