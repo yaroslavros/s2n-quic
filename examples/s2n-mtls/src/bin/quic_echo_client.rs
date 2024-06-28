@@ -48,12 +48,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 async fn google() {
-    // let ca = include_bytes!(concat!(
-    //     env!("CARGO_MANIFEST_DIR"),
-    //     "/data/mozilla-ca-bundle.pem"
-    // ));
-    let ca = include_bytes!("../../google-com.pem");
-
     let mut config = s2n_tls::config::Builder::new();
     config
         .set_application_protocol_preference([b"h3"])
@@ -63,15 +57,24 @@ async fn google() {
         .enable_quic()
         .unwrap();
 
-    // doesn't work
-    // config.with_system_certs(true).unwrap();
-    // config.trust_pem(ca).unwrap(); // this works
+    // DOESN'T WORK: sanity check that not including any CA certs
+    // config.with_system_certs(false).unwrap();
+    //
+    // WORKS: The root cert `../../google-com.pem` is also part of my hosts system cert
+    config.with_system_certs(true).unwrap();
+    //
+    // WORKS
+    // config
+    //     .with_system_certs(false)
+    //     .unwrap()
+    //     .trust_pem(include_bytes!("../../google-com.pem"))
+    //     .unwrap(); // this works
 
     // FIXME REMOVE to test with ca.
     // used to verify that it works without certs
-    unsafe {
-        config.disable_x509_verification().unwrap();
-    }
+    // unsafe {
+    //     config.disable_x509_verification().unwrap();
+    // }
 
     let config = config.build().unwrap();
 
