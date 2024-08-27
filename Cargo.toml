@@ -27,6 +27,9 @@ incremental = false
 # improve flamegraph information
 debug = true
 
+[profile.dev-watch]
+inherits = "dev"
+
 [profile.fuzz]
 inherits = "dev"
 opt-level = 3

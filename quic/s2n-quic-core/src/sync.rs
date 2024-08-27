@@ -11,6 +11,10 @@ pub mod atomic_waker;
 #[cfg(target_has_atomic = "32")]
 pub mod cursor;
 #[cfg(feature = "alloc")]
+pub mod queue;
+#[cfg(feature = "alloc")]
 pub mod spsc;
+#[cfg(feature = "alloc")]
+pub mod stack;
 #[cfg(feature = "alloc")]
 pub mod worker;

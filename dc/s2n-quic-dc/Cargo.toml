@@ -43,9 +43,12 @@ zerocopy = { version = "0.7", features = ["derive"] }
 zeroize = "1"
 
 [dev-dependencies]
+async-channel = "2"
 bolero = "0.11"
 bolero-generator = "0.11"
+hdrhistogram = "7"
 insta = "1"
 s2n-codec = { path = "../../common/s2n-codec", features = ["testing"] }
 s2n-quic-core = { path = "../../quic/s2n-quic-core", features = ["testing"] }
+s2n-quic-platform = { path = "../../quic/s2n-quic-platform", features = ["testing"] }
 tokio = { version = "1", features = ["full"] }
