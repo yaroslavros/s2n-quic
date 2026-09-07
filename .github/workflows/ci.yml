@@ -6,10 +6,10 @@ on:
     branches:
       - main
   schedule:
-    # Run daily job at 8:00 AM PT.
+    # Run daily job at 8:00 AM and 8:00 PM PT.
     # The workflow is run in the morning to allow for the clippy job to resolve lints from new Rust
     # versions in a timely manner.
-    - cron: '0 15 * * *'
+    - cron: '0 3,15 * * *'
   workflow_dispatch:
 
 name: ci
@@ -21,7 +21,7 @@ env:
   RUST_BACKTRACE: 1
   # Pin the nightly toolchain to prevent breakage.
   # This should be occasionally updated.
-  RUST_NIGHTLY_TOOLCHAIN: nightly-2025-03-31
+  RUST_NIGHTLY_TOOLCHAIN: nightly-2025-11-09
   CDN: https://dnglbrstg7yg.cloudfront.net
   # enable unstable features for testing
   S2N_UNSTABLE_CRYPTO_OPT_TX: 100
@@ -46,8 +46,13 @@ jobs:
       examples: ${{ steps.definitions.outputs.examples }}
       crates: ${{ steps.definitions.outputs.crates }}
       workspaces:  ${{ steps.definitions.outputs.workspaces }}
+      start-time: ${{ steps.start-time.outputs.time }}
     steps:
-      - uses: actions/checkout@v5
+      - name: Record workflow start time
+        id: start-time
+        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - uses: actions/checkout@v7
       # examples is populated by
       # find all child folders in the examples directory
       # jq -R - raw content is passed in (not json, just strings)
@@ -63,9 +68,25 @@ jobs:
         id: definitions
         run: |
           rustup show active-toolchain
-          export MSRV=$(rustup show active-toolchain | awk -F'-' '{print $1}')
+          # The MSRV is declared by the `rust-version` field of each crate. It is
+          # deliberately not tied to the toolchain anyone happens to be building
+          # with; jobs that need a specific toolchain install and override it
+          # themselves.
+          export MSRV=$(grep -m1 '^rust-version' quic/s2n-quic/Cargo.toml | sed -E 's/^rust-version *= *"(.+)"/\1/')
           if [ -z "$MSRV" ]; then
             echo "Error: MSRV did not parse correctly"
+            exit 1
+          fi
+          # The MSRV above is the floor s2n-quic promises to its users, so no
+          # crate may declare a lower `rust-version` than it. A crate requiring a
+          # higher one is allowed: the xdp and wireshark workspaces have needed
+          # that in the past when their dependencies outpaced the repository
+          # MSRV. Nothing pins these together anymore, so check it explicitly
+          # rather than silently testing a version some crate does not support.
+          export LOWEST=$(git ls-files '*Cargo.toml' | xargs grep -h '^rust-version' | sed -E 's/^rust-version *= *"(.+)"/\1/' | sort -V | head -1)
+          if [ "$LOWEST" != "$MSRV" ]; then
+            echo "Error: a crate declares rust-version $LOWEST, below the $MSRV MSRV of s2n-quic"
+            git ls-files '*Cargo.toml' | xargs grep -H '^rust-version' | sort -u
             exit 1
           fi
           echo "msrv=$MSRV"
@@ -87,7 +108,7 @@ jobs:
   rustfmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -110,7 +131,7 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -149,7 +170,7 @@ jobs:
 
       - name: Create clippy pull request
         if: steps.should_fix.outputs.SHOULD_FIX == 'true'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           commit-message: |
             chore: clippy lint updates
@@ -164,7 +185,7 @@ jobs:
   udeps:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -191,7 +212,7 @@ jobs:
   doc:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -208,7 +229,7 @@ jobs:
         env:
           RUSTDOCFLAGS: --cfg docsrs
 
-      - uses: aws-actions/configure-aws-credentials@v5.1.0
+      - uses: aws-actions/configure-aws-credentials@v6.2.3
         if: github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name
         with:
           role-to-assume: arn:aws:iam::024603541914:role/GitHubOIDCRole
@@ -250,17 +271,17 @@ jobs:
         include:
           - os: windows-latest
             # s2n-tls and s2n-quic-dc don't currently build on windows
-            exclude: --exclude s2n-quic-tls --exclude s2n-quic-dc --exclude s2n-quic-dc-benches
+            exclude: --exclude s2n-quic-tls --exclude s2n-quic-dc --exclude s2n-quic-dc-benches --exclude s2n-quic-dc-metrics
           - rust: stable
             os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             # s2n-quic-dc tests are too slow to be emulated with QEMU
-            exclude: --exclude s2n-quic-dc --exclude s2n-quic-dc-benches
+            exclude: --exclude s2n-quic-dc --exclude s2n-quic-dc-benches --exclude s2n-quic-dc-metrics
           - rust: stable
             os: ubuntu-latest
             target: i686-unknown-linux-gnu
             # s2n-quic-dc requires a large number of threads for testing, which isn't supported on i686
-            exclude: --exclude s2n-quic-dc --exclude s2n-quic-dc-benches
+            exclude: --exclude s2n-quic-dc --exclude s2n-quic-dc-benches --exclude s2n-quic-dc-metrics
           - rust: stable
             os: ubuntu-latest
             target: x86_64-unknown-linux-musl
@@ -271,14 +292,14 @@ jobs:
             target: native
             env: S2N_QUIC_PLATFORM_FEATURES_OVERRIDE=""
             # s2n-quic-dc requires platform features
-            exclude: --exclude s2n-quic-dc --exclude s2n-quic-dc-benches
+            exclude: --exclude s2n-quic-dc --exclude s2n-quic-dc-benches --exclude s2n-quic-dc-metrics --exclude s2n-quic-bench
           - rust: stable
             os: ubuntu-latest
             target: native
             env: S2N_QUIC_PLATFORM_FEATURES_OVERRIDE="mtu_disc,pktinfo,tos,socket_msg" >> $GITHUB_ENV; echo S2N_QUIC_RUN_VERSION_SPECIFIC_TESTS=1
     steps:
       - uses: ilammy/setup-nasm@v1
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           lfs: true
           submodules: true
@@ -322,10 +343,94 @@ jobs:
         run: |
           ${{ matrix.target != 'native' && 'cross' || 'cargo' }} test --workspace ${{ matrix.exclude }} ${{ matrix.target != 'native' && format('--target {0}', matrix.target) || '' }} ${{ matrix.args }}
 
+  # The previous build runs on MSVC. s2n-quic can use s2n-tls, but only on MinGW, so we need a new job to test that.
+  test-windows-gnu:
+    runs-on: windows-latest
+    name: Windows s2n-tls (${{ matrix.sys }})
+    env:
+      # msys2 ships clang, not gcc, but cc-rs defaults to gcc for *-gnu.
+      CC: clang
+      # gnullvm doesn't auto-link winpthreads, so s2n's pthread/clock_gettime/nanosleep symbols
+      # are undefined; -lpthread links it explicitly. Both vars are needed: RUSTFLAGS for the
+      # normal link, RUSTDOCFLAGS for doctests.
+      CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_RUSTFLAGS: -Clink-arg=-lpthread
+      CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_RUSTDOCFLAGS: -Clink-arg=-lpthread
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sys: ucrt64
+            pkg-prefix: mingw-w64-ucrt-x86_64
+            env-path: /ucrt64
+            rust-host: x86_64-pc-windows-gnu
+          - sys: mingw64
+            pkg-prefix: mingw-w64-x86_64
+            env-path: /mingw64
+            rust-host: x86_64-pc-windows-gnu
+          - sys: clang64
+            pkg-prefix: mingw-w64-clang-x86_64
+            env-path: /clang64
+            # clang64 targets gnullvm, which has no host toolchain, so cross-compile to it from
+            # the gnu host. rust-host is the host we install; cargo-target is what we build for.
+            rust-host: x86_64-pc-windows-gnu
+            cargo-target: x86_64-pc-windows-gnullvm
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          lfs: true
+          submodules: true
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.sys }}
+          update: true
+          install: >-
+            ${{ matrix.pkg-prefix }}-clang
+            ${{ matrix.pkg-prefix }}-clang-libs
+            ${{ matrix.pkg-prefix }}-cmake
+            ${{ matrix.pkg-prefix }}-ninja
+            ${{ matrix.pkg-prefix }}-nasm
+            ${{ matrix.pkg-prefix }}-rustup
+            diffutils
+            jq
+
+      - name: Install Rust toolchain
+        shell: msys2 {0}
+        run: |
+          set -eu
+          # Force the MinGW gnu host; otherwise rustup picks the runner's MSVC host, which can't build the C dependencies.
+          rustup set default-host ${{ matrix.rust-host }}
+          rustup default stable
+          rustup show active-toolchain
+
+          # clang64 has no gnullvm host toolchain, so cross-compile to gnullvm from the gnu host.
+          if [ -n "${{ matrix.cargo-target }}" ]; then
+            rustup target add ${{ matrix.cargo-target }}
+            echo "CARGO_BUILD_TARGET=${{ matrix.cargo-target }}" >> "$GITHUB_ENV"
+            # aws-lc-sys has no prebuilt bindings for gnullvm, so it runs bindgen at build time.
+            # Install bindgen-cli (on PATH) built for the gnullvm environment.
+            cargo install --locked --target ${{ matrix.cargo-target }} \
+              --root "${{ matrix.env-path }}" bindgen-cli
+          fi
+
+      - name: Restore fuzz corpus
+        shell: msys2 {0}
+        run: |
+          find . -name 'corpus.tar.gz' -exec dirname {} ';' | xargs -L 1 bash -c 'cd "$0" && rm -rf corpus && tar xf corpus.tar.gz'
+
+      # Tests the workspace `default-members`, which excludes the `dc/` crates. Crates and tests
+      # that can't build on the MinGW toolchains are gated in their own manifests.
+      - name: Run cargo test
+        shell: msys2 {0}
+        run: |
+          set -eu
+          cargo test
+
   asan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -363,7 +468,7 @@ jobs:
   fips:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -391,7 +496,7 @@ jobs:
       matrix:
         crate: [quic/s2n-quic-core, quic/s2n-quic-platform]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -415,7 +520,7 @@ jobs:
   no_std:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -433,7 +538,7 @@ jobs:
   compliance:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
       - uses: awslabs/duvet-action@v1
@@ -449,7 +554,7 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           lfs: true
           submodules: true
@@ -472,7 +577,7 @@ jobs:
       - name: Run cargo llvm-cov
         run: cargo llvm-cov --html --no-fail-fast --workspace --exclude s2n-quic-qns --all-features
 
-      - uses: aws-actions/configure-aws-credentials@v5.1.0
+      - uses: aws-actions/configure-aws-credentials@v6.2.3
         if: github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name
         with:
           role-to-assume: arn:aws:iam::024603541914:role/GitHubOIDCRole
@@ -513,7 +618,7 @@ jobs:
       matrix:
         crate: ${{ fromJson(needs.env.outputs.crates) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -535,7 +640,7 @@ jobs:
         example: ${{ fromJson(needs.env.outputs.examples) }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -570,7 +675,7 @@ jobs:
   recovery-simulations:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -586,7 +691,7 @@ jobs:
         run: |
           ./scripts/recovery-sim
 
-      - uses: aws-actions/configure-aws-credentials@v5.1.0
+      - uses: aws-actions/configure-aws-credentials@v6.2.3
         if: github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name
         with:
           role-to-assume: arn:aws:iam::024603541914:role/GitHubOIDCRole
@@ -618,7 +723,7 @@ jobs:
   sims:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -637,7 +742,7 @@ jobs:
         run: |
           ./scripts/sim
 
-      - uses: aws-actions/configure-aws-credentials@v5.1.0
+      - uses: aws-actions/configure-aws-credentials@v6.2.3
         if: github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name
         with:
           role-to-assume: arn:aws:iam::024603541914:role/GitHubOIDCRole
@@ -669,7 +774,7 @@ jobs:
   copyright:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Check
         run: |
@@ -678,7 +783,7 @@ jobs:
   s2n-events:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -711,7 +816,7 @@ jobs:
   generate-events:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -736,7 +841,7 @@ jobs:
   snapshots:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -767,7 +872,7 @@ jobs:
   timing:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -782,7 +887,7 @@ jobs:
           cd examples/echo
           cargo build --timings --release --workspace
 
-      - uses: aws-actions/configure-aws-credentials@v5.1.0
+      - uses: aws-actions/configure-aws-credentials@v6.2.3
         if: github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name
         with:
           role-to-assume: arn:aws:iam::024603541914:role/GitHubOIDCRole
@@ -814,7 +919,7 @@ jobs:
   typos:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -842,7 +947,7 @@ jobs:
       matrix:
         crate: [common/s2n-codec, quic/s2n-quic-core, quic/s2n-quic-platform]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -854,7 +959,7 @@ jobs:
   dhat:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install rust toolchain
         id: toolchain
@@ -885,7 +990,7 @@ jobs:
           mv report.tsv target/report/
           mv dhat-heap.json target/report/
 
-      - uses: aws-actions/configure-aws-credentials@v5.1.0
+      - uses: aws-actions/configure-aws-credentials@v6.2.3
         if: github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name
         with:
           role-to-assume: arn:aws:iam::024603541914:role/GitHubOIDCRole
@@ -927,7 +1032,7 @@ jobs:
       matrix:
         crate: [quic/s2n-quic-core]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -950,7 +1055,7 @@ jobs:
   xdp:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           lfs: true
 
@@ -960,11 +1065,10 @@ jobs:
           rustup toolchain install stable --profile minimal --component rustfmt
           rustup override set stable
 
-      - uses: camshaft/install@v1
-        with:
-          crate: bpf-linker
-
       - uses: camshaft/rust-cache@v1
+
+      - name: Install bpf-linker
+        run: cargo install bpf-linker@0.10.4
 
       - name: Build ebpf
         working-directory: tools/xdp
@@ -979,7 +1083,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macOS-latest]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           lfs: true
 
@@ -1015,17 +1119,47 @@ jobs:
   ci-status-report:
     runs-on: ubuntu-latest
     if: ${{ always() }}
-    needs: [env, rustfmt, clippy, udeps, doc, test, asan, fips, miri, no_std, compliance, coverage, crates, examples, recovery-simulations, sims, copyright, s2n-events, generate-events, snapshots, timing, typos, kani, dhat, loom, xdp, dc-wireshark]
+    needs: [env, rustfmt, clippy, udeps, doc, test, test-windows-gnu, asan, fips, miri, no_std, compliance, coverage, crates, examples, recovery-simulations, sims, copyright, s2n-events, generate-events, snapshots, timing, typos, kani, dhat, loom, xdp, dc-wireshark]
     steps:
-      - uses: aws-actions/configure-aws-credentials@v5.1.0
-        if: github.event_name != 'pull_request'
+      - uses: aws-actions/configure-aws-credentials@v6.2.3
+        if: github.event_name == 'push' || github.event_name == 'schedule' || github.repository == github.event.pull_request.head.repo.full_name
         with:
           role-to-assume: arn:aws:iam::003495580562:role/GitHubOIDCRole
           role-session-name: S2nQuicGHASession
           aws-region: us-west-2
+
       - name: Report daily CI run to CloudWatch
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'push' || github.event_name == 'schedule' || github.repository == github.event.pull_request.head.repo.full_name
         run: |
           METRIC_VALUE=${{ contains(needs.*.result, 'failure') && '1' || '0' }}
           aws cloudwatch put-metric-data --namespace "Github" --metric-name "ActionCIFailure" \
             --value $METRIC_VALUE --dimensions Initiator=${{github.event_name}} --timestamp $(date +%s)
+
+      - name: Calculate workflow duration
+        run: |
+          START_TIME=${{ needs.env.outputs.start-time }}
+          END_TIME=$(date +%s)
+          DURATION_SECONDS=$((END_TIME - START_TIME))
+          DURATION_MINUTES=$(echo "scale=2; $DURATION_SECONDS / 60" | bc)
+          CI_STATUS="${{ contains(needs.*.result, 'failure') && 'failure' || 'success' }}"
+          
+          echo "Workflow duration: $DURATION_MINUTES minutes"
+          echo "CI Status: $CI_STATUS"
+          echo "Event type: ${{ github.event_name }}"
+          
+          # Save for next step
+          echo "DURATION_MINUTES=$DURATION_MINUTES" >> $GITHUB_ENV
+          echo "CI_STATUS=$CI_STATUS" >> $GITHUB_ENV
+          echo "END_TIME=$END_TIME" >> $GITHUB_ENV
+
+      - name: Report workflow duration to CloudWatch
+        if: github.event_name == 'push' || github.event_name == 'schedule' || github.repository == github.event.pull_request.head.repo.full_name
+        run: |
+          aws cloudwatch put-metric-data \
+            --namespace "Github" \
+            --metric-name "ActionCIDuration" \
+            --value $DURATION_MINUTES \
+            --dimensions Status=$CI_STATUS \
+            --timestamp $END_TIME
+          
+          echo "Successfully reported workflow duration to CloudWatch"

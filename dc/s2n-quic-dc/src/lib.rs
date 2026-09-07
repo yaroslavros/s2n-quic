@@ -4,6 +4,7 @@
 pub mod allocator;
 pub mod clock;
 pub mod congestion;
+pub mod connection_close;
 pub mod control;
 pub mod credentials;
 pub mod crypto;
@@ -24,6 +25,13 @@ pub mod task;
 pub mod uds;
 
 #[cfg(any(test, feature = "testing"))]
+#[allow(
+    clippy::unwrap_used,
+    clippy::unwrap_in_result,
+    clippy::panic,
+    clippy::panic_in_result_fn,
+    reason = "test-support helpers may panic to surface setup failures"
+)]
 pub mod testing;
 
 pub use s2n_quic_core::dc::{Version, SUPPORTED_VERSIONS};

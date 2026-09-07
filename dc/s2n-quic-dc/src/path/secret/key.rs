@@ -154,19 +154,6 @@ pub mod open {
 
     macro_rules! with_dedup {
         () => {
-            /// Disables replay prevention allowing the decryption key to be reused.
-            ///
-            /// ## Safety
-            /// Disabling replay prevention is insecure because it makes it possible for
-            /// active network attackers to cause a peer to accept previously processed
-            /// data as new. For example, if a packet contains a mutating request such
-            /// as adding +1 to a value in a database, an attacker can keep replaying
-            /// packets to increment the value beyond what the original legitimate
-            /// sender of the packet intended.
-            pub unsafe fn disable_replay_prevention(&mut self) {
-                self.dedup.disable();
-            }
-
             /// Ensures the key has not been used before
             #[inline]
             pub fn on_decrypt_success(&self, payload: &mut UninitSlice) -> open::Result {
@@ -296,7 +283,8 @@ pub mod open {
             key_phase: KeyPhase,
             packet_number: u64,
             header: &[u8],
-            payload_and_tag: &mut [u8],
+            payload: &mut [u8],
+            tag: &[u8],
         ) -> open::Result {
             let opener = match key_phase {
                 KeyPhase::Zero => &self.openers[0],
@@ -308,10 +296,11 @@ pub mod open {
                 KeyPhase::Zero,
                 packet_number,
                 header,
-                payload_and_tag,
+                payload,
+                tag,
             )?;
 
-            self.on_decrypt_success(payload_and_tag.into())?;
+            self.on_decrypt_success(payload.into())?;
 
             if key_phase != self.key_phase {
                 self.needs_update.store(true, Ordering::Relaxed);
@@ -386,7 +375,8 @@ pub mod open {
             key_phase: KeyPhase,
             packet_number: u64,
             header: &[u8],
-            payload_and_tag: &mut [u8],
+            payload: &mut [u8],
+            tag: &[u8],
         ) -> open::Result {
             ensure!(
                 key_phase == KeyPhase::Zero,
@@ -394,9 +384,9 @@ pub mod open {
             );
 
             self.key
-                .decrypt_in_place(key_phase, packet_number, header, payload_and_tag)?;
+                .decrypt_in_place(key_phase, packet_number, header, payload, tag)?;
 
-            self.on_decrypt_success(payload_and_tag.into())?;
+            self.on_decrypt_success(payload.into())?;
 
             ensure!(
                 !self.opened.swap(true, Ordering::Relaxed),

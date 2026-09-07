@@ -32,7 +32,6 @@ use intrusive_collections::{
     intrusive_adapter, KeyAdapter, LinkedList, LinkedListLink, RBTree, RBTreeLink,
 };
 use s2n_quic_core::{
-    application,
     application::ServerName,
     event::supervisor,
     inet::SocketAddress,
@@ -45,30 +44,30 @@ use smallvec::SmallVec;
 
 // Intrusive list adapter for managing the list of `done` connections
 intrusive_adapter!(DoneConnectionsAdapter<C, L> = Arc<ConnectionNode<C, L>>: ConnectionNode<C, L> {
-    done_connections_link: LinkedListLink
+    done_connections_link => LinkedListLink
 } where C: connection::Trait, L: connection::Lock<C>);
 
 // Intrusive list adapter for managing the list of
 // `waiting_for_transmission` connections
 intrusive_adapter!(WaitingForTransmissionAdapter<C, L> = Arc<ConnectionNode<C, L>>: ConnectionNode<C, L> {
-    waiting_for_transmission_link: LinkedListLink
+    waiting_for_transmission_link => LinkedListLink
 } where C: connection::Trait, L: connection::Lock<C>);
 
 // Intrusive list adapter for managing the list of
 // `waiting_for_connection_id` connections
 intrusive_adapter!(WaitingForConnectionIdAdapter<C, L> = Arc<ConnectionNode<C, L>>: ConnectionNode<C, L> {
-    waiting_for_connection_id_link: LinkedListLink
+    waiting_for_connection_id_link => LinkedListLink
 } where C: connection::Trait, L: connection::Lock<C>);
 
 // Intrusive red black tree adapter for managing a list of `waiting_for_timeout` connections
 intrusive_adapter!(WaitingForTimeoutAdapter<C, L> = Arc<ConnectionNode<C, L>>: ConnectionNode<C, L> {
-    waiting_for_timeout_link: RBTreeLink
+    waiting_for_timeout_link => RBTreeLink
 } where C: connection::Trait, L: connection::Lock<C>);
 
 // Intrusive red black tree adapter for managing all connections in a tree for
 // lookup by Connection ID
 intrusive_adapter!(ConnectionTreeAdapter<C, L> = Arc<ConnectionNode<C, L>>: ConnectionNode<C, L> {
-    tree_link: RBTreeLink
+    tree_link => RBTreeLink
 } where C: connection::Trait, L: connection::Lock<C>);
 
 /// A wrapper around a `Connection` implementation which allows to insert the
@@ -122,7 +121,7 @@ impl<C: connection::Trait, L: connection::Lock<C>> ConnectionNode<C, L> {
     /// This method is only safe to be called if the `ConnectionNode` is known to be
     /// stored inside a `Arc`.
     unsafe fn arc_from_ref(&self) -> Arc<Self> {
-        // In order to be able to to get a `Arc` we construct a temporary `Arc`
+        // In order to be able to get a `Arc` we construct a temporary `Arc`
         // from it using the `Arc::from_raw` API and clone the `Arc`.
         // The temporary `Arc` must be released without calling `drop`,
         // because this would decrement and thereby invalidate the refcount
@@ -296,7 +295,7 @@ impl<C: connection::Trait, L: connection::Lock<C>> ConnectionApiProvider for Con
         }
     }
 
-    fn close_connection(&self, error: Option<application::Error>) {
+    fn close_connection(&self, error: Option<connection::Error>) {
         let _: Result<(), connection::Error> = self.api_write_call(|conn| {
             conn.application_close(error);
             Ok(())
@@ -740,7 +739,7 @@ impl<C: connection::Trait, L: connection::Lock<C>> ConnectionContainer<C, L> {
         self.connector_receiver.close();
 
         // drain the connector_receiver queue
-        while let Ok(Some(request)) = self.connector_receiver.try_next() {
+        while let Ok(request) = self.connector_receiver.try_recv() {
             if request
                 .sender
                 .send(Err(connection::Error::endpoint_closing()))
@@ -1143,6 +1142,17 @@ impl<C: connection::Trait, L: connection::Lock<C>> ConnectionContainer<C, L> {
         debug_assert!(remove_result.is_some());
 
         self.interest_lists.remove_node(connection);
+    }
+}
+
+impl<C: connection::Trait, L: connection::Lock<C>> Drop for ConnectionContainer<C, L> {
+    // ConnectionContainer dropped means Endpoint is dropped. Close all connections.
+    fn drop(&mut self) {
+        let mut cursor = self.connection_map.front();
+        while let Some(node) = cursor.get() {
+            node.close_connection(Some(connection::Error::endpoint_closing()));
+            cursor.move_next();
+        }
     }
 }
 

@@ -84,6 +84,7 @@ fn server_transport_parameters() -> ServerTransportParameters {
             len: 1,
             versions: [3, 0, 0, 0],
         },
+        mtu_probing_complete_support: MtuProbingCompleteSupport::Enabled,
     }
 }
 
@@ -125,6 +126,7 @@ fn client_transport_parameters() -> ClientTransportParameters {
             len: 4,
             versions: [1, 2, 3, 4],
         },
+        mtu_probing_complete_support: MtuProbingCompleteSupport::Enabled,
     }
 }
 
@@ -333,4 +335,36 @@ fn dc_selected_version() {
     assert!(DcSupportedVersions::for_client([1, 2])
         .selected_version()
         .is_err());
+}
+
+#[test]
+fn mtu_probing_complete_support_encoding() {
+    let id_bytes = MtuProbingCompleteSupport::ID.encode_to_vec();
+    let mut params = ClientTransportParameters::default();
+
+    // When Enabled, the parameter SHOULD be encoded
+    {
+        params.mtu_probing_complete_support = MtuProbingCompleteSupport::Enabled;
+        let encoded = params.encode_to_vec();
+
+        assert!(
+            encoded
+                .windows(id_bytes.len())
+                .any(|window| window == id_bytes.as_slice()),
+            "MtuProbingCompleteSupport parameter should be encoded when Enabled"
+        );
+    }
+
+    // When Disabled, the parameter should NOT be encoded
+    {
+        params.mtu_probing_complete_support = MtuProbingCompleteSupport::Disabled;
+        let encoded = params.encode_to_vec();
+
+        assert!(
+            !encoded
+                .windows(id_bytes.len())
+                .any(|window| window == id_bytes.as_slice()),
+            "MtuProbingCompleteSupport parameter should NOT be encoded when Disabled"
+        );
+    }
 }

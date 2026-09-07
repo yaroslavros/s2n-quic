@@ -9,11 +9,11 @@ use super::*;
 #[test]
 fn stream_reset_test() {
     let model = Model::default();
-    test(model, |handle| {
+    test(model.clone(), |handle| {
         let mut server = Server::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(SERVER_CERTS)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(true, model.clone()))?
             .with_random(Random::with_seed(456))?
             .with_limits(
                 provider::limits::Limits::default()
@@ -27,12 +27,13 @@ fn stream_reset_test() {
         spawn(async move {
             while let Some(mut connection) = server.accept().await {
                 spawn(async move {
-                    while let Some(mut stream) =
-                        connection.accept_bidirectional_stream().await.unwrap()
+                    // the endpoint is dropped when the test finishes, which closes the
+                    // connection, so don't treat errors here as test failures
+                    while let Ok(Some(mut stream)) = connection.accept_bidirectional_stream().await
                     {
                         spawn(async move {
                             // drain the receive stream
-                            while stream.receive().await.unwrap().is_some() {}
+                            while let Ok(Some(_)) = stream.receive().await {}
 
                             // send data until the client resets the stream
                             while stream.send(Bytes::from_static(&[42; 1024])).await.is_ok() {}
@@ -42,7 +43,7 @@ fn stream_reset_test() {
             }
         });
 
-        let client = build_client(handle)?;
+        let client = build_client(handle, model.clone(), true)?;
 
         primary::spawn(async move {
             let connect = Connect::new(server_addr).with_server_name("localhost");

@@ -16,6 +16,8 @@ use crate::{
     },
     transport,
 };
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 use s2n_codec::{CheckedRange, DecoderBufferMut, DecoderBufferMutResult, Encoder, EncoderValue};
 
 //= https://www.rfc-editor.org/rfc/rfc9000#section-17.3.1
@@ -57,16 +59,11 @@ const SPIN_BIT_MASK: u8 = 0x20;
 
 const RESERVED_BITS_MASK: u8 = 0x18;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub enum SpinBit {
+    #[default]
     Zero,
     One,
-}
-
-impl Default for SpinBit {
-    fn default() -> Self {
-        Self::Zero
-    }
 }
 
 impl SpinBit {
@@ -193,6 +190,11 @@ impl<'a> ProtectedShort<'a> {
         self.payload
             .get_checked_range(&self.destination_connection_id)
             .into_less_safe_slice()
+    }
+
+    #[cfg(feature = "alloc")]
+    pub fn get_wire_bytes(&self) -> Vec<u8> {
+        self.payload.buffer.encode_to_vec()
     }
 }
 

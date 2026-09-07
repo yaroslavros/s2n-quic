@@ -59,6 +59,7 @@ where
         let map = Map::new(
             stateless_reset::Signer::random(),
             1,
+            false,
             time::NoopClock,
             sub.clone(),
         );
@@ -84,14 +85,14 @@ where
 
         let remote_address = tcp_stream.peer_addr()?;
         let mut buffer =
-            Message::new_from_packet(decoded_packet.payload().to_vec().clone(), remote_address);
+            Message::new_from_packet(decoded_packet.payload().to_vec(), remote_address);
 
         let initial_packet = match server::InitialPacket::peek(&mut buffer, 16) {
             Ok(packet) => packet,
             Err(err) => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
-                    format!("Failed to peek initial packet, err: {:?}", err),
+                    format!("Failed to peek initial packet, err: {err:?}"),
                 ));
             }
         };
@@ -115,7 +116,7 @@ where
             decoded_packet.export_secret().try_into().map_err(|e| {
                 std::io::Error::new(
                     ErrorKind::InvalidInput,
-                    format!("Error parsing export secret {:?}", e),
+                    format!("Error parsing export secret {e:?}"),
                 )
             })?;
 
@@ -162,6 +163,9 @@ where
             crypto,
             decoded_packet.application_params().clone(),
             secret_control,
+            // application_data is not available for UDS streams because the in-application
+            // map does not contain the credential ID used by the forwarding process.
+            None,
         ) {
             Ok(stream) => stream,
             Err(error) => {
@@ -201,7 +205,7 @@ where
             }
             Err(e) => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                format!("Failed to decode unix packet: {:?}", e),
+                format!("Failed to decode unix packet: {e:?}"),
             )),
         }
     }

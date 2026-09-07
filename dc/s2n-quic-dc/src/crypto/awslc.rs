@@ -22,6 +22,10 @@ pub mod seal {
     impl Application {
         #[inline]
         pub fn new(key: &[u8], iv: [u8; NONCE_LEN], algorithm: &'static Algorithm) -> Self {
+            #[expect(
+                clippy::unwrap_used,
+                reason = "key sizes are statically known, moving the panic into callers isn't helpful"
+            )]
             let key = UnboundKey::new(algorithm, key).unwrap();
             let key = LessSafeKey::new(key);
             Self { key, iv: Iv(iv) }
@@ -151,6 +155,10 @@ pub mod open {
     impl Application {
         #[inline]
         pub fn new(key: &[u8], iv: [u8; NONCE_LEN], algorithm: &'static Algorithm) -> Self {
+            #[expect(
+                clippy::unwrap_used,
+                reason = "key sizes are statically known, moving the panic into callers isn't helpful"
+            )]
             let key = UnboundKey::new(algorithm, key).unwrap();
             let key = LessSafeKey::new(key);
             Self { key, iv: Iv(iv) }
@@ -201,7 +209,8 @@ pub mod open {
             key_phase: KeyPhase,
             packet_number: u64,
             header: &[u8],
-            payload_and_tag: &mut [u8],
+            payload: &mut [u8],
+            tag: &[u8],
         ) -> Result {
             ensure!(
                 key_phase == KeyPhase::Zero,
@@ -211,7 +220,7 @@ pub mod open {
             let aad = Aad::from(header);
 
             self.key
-                .open_in_place(nonce, aad, payload_and_tag)
+                .open_in_place_separate_tag(nonce, aad, tag, payload)
                 .map_err(|_| Error::InvalidTag)?;
 
             Ok(())

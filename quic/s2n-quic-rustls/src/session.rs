@@ -73,6 +73,11 @@ impl tls::TlsSession for Session {
             .map(|v| v.to_vec())
             .collect())
     }
+
+    fn client_cert_chain_der(&self) -> Result<Option<Vec<u8>>, tls::ChainError> {
+        // As far as I can tell, rustls doesn't support retrieving unverified cert chains.
+        Err(tls::ChainError::failure())
+    }
 }
 
 impl fmt::Debug for Session {
@@ -391,8 +396,9 @@ impl tls::Session for Session {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Default)]
 enum HandshakePhase {
+    #[default]
     Initial,
     Handshake,
     Application,
@@ -404,11 +410,5 @@ impl HandshakePhase {
             Self::Initial => Self::Handshake,
             _ => Self::Application,
         };
-    }
-}
-
-impl Default for HandshakePhase {
-    fn default() -> Self {
-        Self::Initial
     }
 }

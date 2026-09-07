@@ -52,6 +52,10 @@ impl State {
 
         // The atomic will not be incremented (i.e., would have panic'd above) if we do not fit
         // into a VarInt.
+        #[expect(
+            clippy::unwrap_used,
+            reason = "id was produced by a successful VarInt::try_from in fetch_update, so it is provably in range"
+        )]
         VarInt::try_from(id).unwrap()
     }
 
@@ -72,6 +76,11 @@ impl State {
     pub(super) fn update_for_stale_key(&self, min_key_id: VarInt) {
         // Update the key to the new minimum to start at.
         self.current_id.fetch_max(*min_key_id, Ordering::Relaxed);
+    }
+
+    #[cfg(test)]
+    pub fn reset_counter(&self) {
+        self.current_id.store(0, Ordering::Relaxed);
     }
 }
 

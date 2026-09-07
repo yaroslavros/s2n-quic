@@ -52,7 +52,7 @@ impl<Providers: ClientProviders> Builder<Providers> {
         /// impl connection_id::Generator for MyConnectionIdFormat {
         ///     fn generate(&mut self, _conn_info: &connection_id::ConnectionInfo) -> connection_id::LocalId {
         ///         let mut id = [0u8; 16];
-        ///         rand::thread_rng().fill_bytes(&mut id);
+        ///         rand::rng().fill_bytes(&mut id);
         ///         connection_id::LocalId::try_from_bytes(&id[..]).unwrap()
         ///     }
         /// }
@@ -282,6 +282,41 @@ impl<Providers: ClientProviders> Builder<Providers> {
         /// ```
         with_tls,
         tls,
+        ClientProviders
+    );
+
+    #[cfg(any(test, feature = "unstable-provider-connection-close-formatter"))]
+    impl_provider_method!(
+        /// Sets the connection close formatter for the [`Client`]
+        ///
+        /// The connection close formatter controls how errors are encoded in
+        /// CONNECTION_CLOSE frames sent to the peer. The default (`Production`)
+        /// formatter removes potentially sensitive information such as specific TLS alert
+        /// codes and reason phrases.
+        ///
+        /// # Examples
+        ///
+        /// Uses the `Development` formatter which passes all errors through
+        /// unmodified. This should only be used during development.
+        ///
+        /// Alternatively, implement [`connection_close_formatter::Formatter`]
+        /// for custom behavior.
+        ///
+        /// ```rust,no_run
+        /// # use std::error::Error;
+        /// use s2n_quic::{Client, provider::connection_close_formatter};
+        /// #
+        /// # #[tokio::main]
+        /// # async fn main() -> Result<(), Box<dyn Error>> {
+        /// let client = Client::builder()
+        ///     .with_connection_close_formatter(connection_close_formatter::Development)?
+        ///     .start()?;
+        /// #
+        /// #    Ok(())
+        /// # }
+        /// ```
+        with_connection_close_formatter,
+        connection_close_formatter,
         ClientProviders
     );
 

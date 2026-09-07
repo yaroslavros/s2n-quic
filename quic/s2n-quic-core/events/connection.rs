@@ -26,6 +26,12 @@ struct KeyExchangeGroup<'a> {
     contains_kem: bool,
 }
 
+#[event("transport:signature_scheme")]
+/// Signature scheme was negotiated for the connection
+struct SignatureScheme<'a> {
+    chosen_signature_scheme: &'a str,
+}
+
 #[event("transport:packet_skipped")]
 /// Packet was skipped with a given reason
 struct PacketSkipped {
@@ -43,6 +49,8 @@ struct PacketSent {
     #[measure("bytes", Bytes)]
     #[counter("bytes.total", Bytes)]
     packet_len: usize,
+    #[nominal_counter("transmission_mode")]
+    transmission_mode: TransmissionMode,
 }
 
 #[event("transport:packet_received")]
@@ -51,6 +59,9 @@ struct PacketSent {
 struct PacketReceived {
     #[nominal_counter("kind")]
     packet_header: PacketHeader,
+    #[measure("bytes", Bytes)]
+    #[counter("bytes.total", Bytes)]
+    packet_len: usize,
 }
 
 #[event("connectivity:active_path_updated")]
@@ -208,6 +219,46 @@ struct PacketDropped<'a> {
     #[nominal_counter("reason")]
     reason: PacketDropReason<'a>,
 }
+
+#[event("transport:packet_buffered")]
+/// A packet was buffered on the connection because keys for its packet
+/// number space were not yet available.
+struct PacketBuffered {
+    #[nominal_counter("packet_type")]
+    packet_type: PacketType,
+    /// The wire-length of the packet that was buffered.
+    #[measure("bytes", Bytes)]
+    #[counter("bytes.total", Bytes)]
+    packet_len: usize,
+    /// The total number of bytes held in the connection's packet buffer
+    /// after this packet was appended.
+    #[measure("buffer_len", Bytes)]
+    buffer_len: usize,
+}
+
+#[event("transport:packet_buffer_drained")]
+/// The connection's packet buffer was drained after the corresponding key
+/// space became available. All previously buffered packets are now being
+/// processed.
+struct PacketBufferDrained {
+    #[nominal_counter("packet_type")]
+    packet_type: PacketType,
+    /// The total number of bytes drained from the packet buffer.
+    #[measure("bytes", Bytes)]
+    #[counter("bytes.total", Bytes)]
+    buffer_len: usize,
+    /// The elapsed time from when the first packet was buffered until this
+    /// drain occurred. For drains of the 1-RTT buffer (which only holds a
+    /// single packet) this is that packet's buffered duration. For drains of
+    /// the Handshake buffer (which can accumulate multiple packets) this is
+    /// the age of the oldest packet in the batch.
+    #[timer("oldest_buffered_duration")]
+    oldest_buffered_duration: core::time::Duration,
+}
+
+#[event("transport:packet_buffer_error")]
+/// Connection failure occurred while processing a packet from the connection's packet buffer
+struct PacketBufferError {}
 
 #[event("security:key_update")]
 //= https://tools.ietf.org/id/draft-marx-qlog-event-definitions-quic-h3-02#5.2.1
@@ -402,6 +453,17 @@ struct MtuUpdated {
     search_complete: bool,
 }
 
+#[event("transport:mtu_probing_complete_received")]
+/// MTU_PROBING_COMPLETE frame was received
+struct MtuProbingCompleteReceived<'a> {
+    #[nominal_counter("packet")]
+    packet_header: PacketHeader,
+    path: Path<'a>,
+    /// The confirmed MTU value from the frame
+    #[measure("mtu", Bytes)]
+    mtu: u16,
+}
+
 #[event("recovery:slow_start_exited")]
 /// The slow start congestion controller state has been exited
 struct SlowStartExited {
@@ -430,7 +492,7 @@ struct PacingRateUpdated {
     bytes_per_second: u64,
     #[measure("burst_size", Bytes)]
     burst_size: u32,
-    #[measure("pacing_gain")]
+    #[measure("pacing_gain", Float)]
     pacing_gain: f32,
 }
 
@@ -459,6 +521,13 @@ struct DcPathCreated<'a> {
     /// This is the dc::Path struct, it's just type-erased. But if an event subscriber knows the
     /// type they can downcast.
     path: &'a (dyn core::any::Any + Send + 'static),
+}
+
+#[event("transport:dc_state_incomplete")]
+/// The dc handshake did not reach the `Complete` or an error state before the connection closed
+struct DcStateIncomplete {
+    #[nominal_counter("state")]
+    state: DcHandshakeState,
 }
 
 // NOTE - This event MUST come last, since connection-level aggregation depends on it

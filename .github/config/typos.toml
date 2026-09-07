@@ -7,8 +7,12 @@ check-filename = true
 0f2496ba = "0f2496ba"
 
 [default.extend-words]
+# msg_controllen is a standard POSIX field name in msghdr struct
+controllen = "controllen"
 # ECN Capable Transport
 ect = "ect"
+# inline assembly operand constraint
+inout = "inout"
 # num_rational uses "numer" as short for "numerator"
 numer = "numer"
 # Packet number

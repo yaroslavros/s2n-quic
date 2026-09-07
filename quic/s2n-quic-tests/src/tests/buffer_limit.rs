@@ -30,7 +30,7 @@ fn buffer_limit_test() {
     let client_hello_subscriber = recorder::TlsClientHello::new();
     let client_hello_event = client_hello_subscriber.events();
 
-    test(model, |handle| {
+    test(model.clone(), |handle| {
         let server = tls::Server::builder()
             .with_application_protocols(["h3"].iter())
             .unwrap()
@@ -43,7 +43,7 @@ fn buffer_limit_test() {
             .with_io(handle.builder().build()?)?
             .with_tls(server)?
             .with_event((
-                tracing_events(),
+                tracing_events(true, model.clone()),
                 (client_hello_subscriber, connection_closed_subscriber),
             ))?
             .with_random(Random::with_seed(456))?
@@ -66,7 +66,7 @@ fn buffer_limit_test() {
         let client = Client::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(client)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(true, model.clone()))?
             .with_random(Random::with_seed(456))?
             .start()?;
 
@@ -98,7 +98,10 @@ fn buffer_limit_test() {
 
     // Rustls emits INTERNAL_ERROR and S2N-TLS emits UNEXPECTED_MESSAGE error
     // when the server close the connection due to large Client Hello.
-    let expected_error = if cfg!(target_os = "windows") {
+    //
+    // rustls is only the default TLS provider on Windows with the MSVC toolchain. On unix and on
+    // Windows with the GNU/MinGW toolchain (target_env = "gnu"), s2n-tls is the default.
+    let expected_error = if cfg!(all(target_os = "windows", target_env = "msvc")) {
         TlsError::INTERNAL_ERROR
     } else {
         TlsError::UNEXPECTED_MESSAGE

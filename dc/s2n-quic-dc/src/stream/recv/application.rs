@@ -3,8 +3,10 @@
 
 use crate::{
     clock::Timer,
+    credentials::Id,
     event::{self, ConnectionPublisher as _},
     msg,
+    path::secret::map::ApplicationData,
     stream::{
         recv, runtime,
         shared::{AcceptState, ArcShared, ShutdownKind},
@@ -135,6 +137,16 @@ where
     }
 
     #[inline]
+    pub fn path_secret_id(&self) -> &Id {
+        &self.0.shared.credentials().id
+    }
+
+    #[inline]
+    pub fn path_application_data(&self) -> Option<&ApplicationData> {
+        self.0.shared.application_data()
+    }
+
+    #[inline]
     pub fn protocol(&self) -> socket::Protocol {
         self.0.sockets.protocol()
     }
@@ -194,6 +206,26 @@ where
         self.0.publish_read_events(capacity, start_time, &result);
 
         result
+    }
+
+    pub fn query_event_context<C: 'static, R>(&self, query: impl FnOnce(&C) -> R) -> Option<R> {
+        let ctxt = &self.0.shared.common.subscriber.context;
+        let mut query = s2n_quic_core::query::Once::new(query);
+        Sub::query(ctxt, &mut query);
+        let res: Result<_, _> = query.into();
+        match res {
+            Ok(r) => Some(r),
+            // ConnectionLockPoisoned is not used except by s2n-quic infrastructure, so it's not
+            // reachable here.
+            Err(s2n_quic_core::query::Error::ConnectionLockPoisoned) => unreachable!(),
+            Err(s2n_quic_core::query::Error::ContextTypeMismatch) => None,
+            // unreachable in practice, needed due to #[non_exhaustive]
+            Err(_) => None,
+        }
+    }
+
+    pub fn peer_cert_chain(&self) -> Option<&crate::stream::tls::CertificateChain> {
+        self.0.shared.s2n_connection.as_ref()?.peer_cert_chain()
     }
 }
 
@@ -352,8 +384,17 @@ where
 
     #[inline]
     fn shutdown(mut self: Box<Self>) {
-        // If the application never read from the stream try to do so now
-        if let LocalState::Ready = self.local_state {
+        // Attempt a non-blocking drain if the application hasn't consumed all peer data:
+        //
+        // - Ready: the application never read from the stream, so we try now to process any
+        //   secret control packets the peer may have sent.
+        // - Reading: the application read some data but hasn't consumed a possible authenticated
+        //   closure frame, leaving it in the kernel's TCP receive buffer. Without this,
+        //   `close(fd)` sends RST instead of a clean shutdown. See `tcp_close()` in
+        //   `net/ipv4/tcp.c`: when `sk_receive_queue` is non-empty at close time, the kernel
+        //   calls `tcp_set_state(sk, TCP_CLOSE)` and sends RST rather than FIN. This increments
+        //   `TcpExtTCPAbortOnClose` (`/proc/net/netstat`).
+        if matches!(self.local_state, LocalState::Ready | LocalState::Reading) {
             let mut storage = buffer::writer::storage::Empty;
             let waker = s2n_quic_core::task::waker::noop();
             let mut cx = core::task::Context::from_waker(&waker);

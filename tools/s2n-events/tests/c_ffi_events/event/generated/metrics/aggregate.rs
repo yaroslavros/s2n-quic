@@ -12,21 +12,43 @@ use crate::event::{
         AsVariant, BoolRecorder, Info, Metric, NominalRecorder, Recorder, Registry, Units,
     },
 };
+mod id {
+    #[allow(non_camel_case_types)]
+    #[allow(clippy::upper_case_acronyms)]
+    enum InfoId {
+        BYTE_ARRAY_EVENT,
+        ENUM_EVENT,
+        COUNT_EVENT,
+    }
+    pub const BYTE_ARRAY_EVENT: usize = InfoId::BYTE_ARRAY_EVENT as usize;
+    pub const ENUM_EVENT: usize = InfoId::ENUM_EVENT as usize;
+    pub const COUNT_EVENT: usize = InfoId::COUNT_EVENT as usize;
+    #[allow(non_camel_case_types)]
+    #[allow(clippy::upper_case_acronyms)]
+    enum Counters {
+        COUNTERS_BYTE_ARRAY_EVENT,
+        COUNTERS_ENUM_EVENT,
+        COUNTERS_COUNT_EVENT,
+    }
+    pub const COUNTERS_BYTE_ARRAY_EVENT: usize = Counters::COUNTERS_BYTE_ARRAY_EVENT as usize;
+    pub const COUNTERS_ENUM_EVENT: usize = Counters::COUNTERS_ENUM_EVENT as usize;
+    pub const COUNTERS_COUNT_EVENT: usize = Counters::COUNTERS_COUNT_EVENT as usize;
+}
 static INFO: &[Info; 3usize] = &[
     info::Builder {
-        id: 0usize,
+        id: id::BYTE_ARRAY_EVENT,
         name: Str::new("byte_array_event\0"),
         units: Units::None,
     }
     .build(),
     info::Builder {
-        id: 1usize,
+        id: id::ENUM_EVENT,
         name: Str::new("enum_event\0"),
         units: Units::None,
     }
     .build(),
     info::Builder {
-        id: 2usize,
+        id: id::COUNT_EVENT,
         name: Str::new("count_event\0"),
         units: Units::None,
     }
@@ -65,12 +87,12 @@ impl<R: Registry + Default> Default for Subscriber<R> {
     }
 }
 impl<R: Registry> Subscriber<R> {
-    #[doc = r" Creates a new subscriber with the given registry"]
-    #[doc = r""]
-    #[doc = r" # Note"]
-    #[doc = r""]
-    #[doc = r" All of the recorders are registered on initialization and cached for the lifetime"]
-    #[doc = r" of the subscriber."]
+    /// Creates a new subscriber with the given registry
+    ///
+    /// # Note
+    ///
+    /// All of the recorders are registered on initialization and cached for the lifetime
+    /// of the subscriber.
     #[allow(unused_mut)]
     #[inline]
     pub fn new(registry: R) -> Self {
@@ -83,9 +105,9 @@ impl<R: Registry> Subscriber<R> {
         let mut timers = Vec::with_capacity(0usize);
         let mut nominal_timers = Vec::with_capacity(0usize);
         let mut nominal_timer_offsets = Vec::with_capacity(0usize);
-        counters.push(registry.register_counter(&INFO[0usize]));
-        counters.push(registry.register_counter(&INFO[1usize]));
-        counters.push(registry.register_counter(&INFO[2usize]));
+        counters.push(registry.register_counter(&INFO[id::BYTE_ARRAY_EVENT]));
+        counters.push(registry.register_counter(&INFO[id::ENUM_EVENT]));
+        counters.push(registry.register_counter(&INFO[id::COUNT_EVENT]));
         {
             #[allow(unused_imports)]
             use api::*;
@@ -117,16 +139,16 @@ impl<R: Registry> Subscriber<R> {
             registry,
         }
     }
-    #[doc = r" Returns all of the registered counters"]
+    /// Returns all of the registered counters
     #[inline]
     pub fn counters(&self) -> impl Iterator<Item = (&'static Info, &R::Counter)> + '_ {
         self.counters
             .iter()
             .enumerate()
             .map(|(idx, entry)| match idx {
-                0usize => (&INFO[0usize], entry),
-                1usize => (&INFO[1usize], entry),
-                2usize => (&INFO[2usize], entry),
+                id::COUNTERS_BYTE_ARRAY_EVENT => (&INFO[id::BYTE_ARRAY_EVENT], entry),
+                id::COUNTERS_ENUM_EVENT => (&INFO[id::ENUM_EVENT], entry),
+                id::COUNTERS_COUNT_EVENT => (&INFO[id::COUNT_EVENT], entry),
                 _ => unsafe { core::hint::unreachable_unchecked() },
             })
     }
@@ -137,7 +159,7 @@ impl<R: Registry> Subscriber<R> {
         let counter = &self.counters[id];
         counter.record(info, value);
     }
-    #[doc = r" Returns all of the registered bool counters"]
+    /// Returns all of the registered bool counters
     #[inline]
     pub fn bool_counters(&self) -> impl Iterator<Item = (&'static Info, &R::BoolCounter)> + '_ {
         core::iter::empty()
@@ -149,7 +171,7 @@ impl<R: Registry> Subscriber<R> {
         let counter = &self.bool_counters[id];
         counter.record(info, value);
     }
-    #[doc = r" Returns all of the registered nominal counters"]
+    /// Returns all of the registered nominal counters
     #[inline]
     pub fn nominal_counters(
         &self,
@@ -166,7 +188,7 @@ impl<R: Registry> Subscriber<R> {
         let counter = &self.nominal_counters[idx];
         counter.record(info, value.as_variant(), 1usize);
     }
-    #[doc = r" Returns all of the registered measures"]
+    /// Returns all of the registered measures
     #[inline]
     pub fn measures(&self) -> impl Iterator<Item = (&'static Info, &R::Measure)> + '_ {
         core::iter::empty()
@@ -178,7 +200,7 @@ impl<R: Registry> Subscriber<R> {
         let measure = &self.measures[id];
         measure.record(info, value);
     }
-    #[doc = r" Returns all of the registered gauges"]
+    /// Returns all of the registered gauges
     #[inline]
     pub fn gauges(&self) -> impl Iterator<Item = (&'static Info, &R::Gauge)> + '_ {
         core::iter::empty()
@@ -190,7 +212,7 @@ impl<R: Registry> Subscriber<R> {
         let gauge = &self.gauges[id];
         gauge.record(info, value);
     }
-    #[doc = r" Returns all of the registered timers"]
+    /// Returns all of the registered timers
     #[inline]
     pub fn timers(&self) -> impl Iterator<Item = (&'static Info, &R::Timer)> + '_ {
         core::iter::empty()
@@ -237,7 +259,7 @@ impl<R: Registry> event::Subscriber for Subscriber<R> {
     ) {
         #[allow(unused_imports)]
         use api::*;
-        self.count(0usize, 0usize, 1usize);
+        self.count(id::BYTE_ARRAY_EVENT, id::COUNTERS_BYTE_ARRAY_EVENT, 1usize);
         let _ = context;
         let _ = meta;
         let _ = event;
@@ -251,7 +273,7 @@ impl<R: Registry> event::Subscriber for Subscriber<R> {
     ) {
         #[allow(unused_imports)]
         use api::*;
-        self.count(1usize, 1usize, 1usize);
+        self.count(id::ENUM_EVENT, id::COUNTERS_ENUM_EVENT, 1usize);
         let _ = context;
         let _ = meta;
         let _ = event;
@@ -260,7 +282,7 @@ impl<R: Registry> event::Subscriber for Subscriber<R> {
     fn on_count_event(&mut self, meta: &api::EndpointMeta, event: &api::CountEvent) {
         #[allow(unused_imports)]
         use api::*;
-        self.count(2usize, 2usize, 1usize);
+        self.count(id::COUNT_EVENT, id::COUNTERS_COUNT_EVENT, 1usize);
         let _ = event;
         let _ = meta;
     }

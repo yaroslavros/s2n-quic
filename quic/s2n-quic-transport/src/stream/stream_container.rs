@@ -21,42 +21,42 @@ use s2n_quic_core::{stream::StreamId, time::timer};
 
 // Intrusive list adapter for managing the list of `done` streams
 intrusive_adapter!(DoneStreamsAdapter<S> = Rc<StreamNode<S>>: StreamNode<S> {
-    done_streams_link: LinkedListLink
+    done_streams_link => LinkedListLink
 });
 
 // Intrusive list adapter for managing the list of `waiting_for_frame_delivery` streams
 intrusive_adapter!(WaitingForFrameDeliveryAdapter<S> = Rc<StreamNode<S>>: StreamNode<S> {
-    waiting_for_frame_delivery_link: LinkedListLink
+    waiting_for_frame_delivery_link => LinkedListLink
 });
 
 // Intrusive list adapter for managing the list of
 // `waiting_for_transmission` streams
 intrusive_adapter!(WaitingForTransmissionAdapter<S> = Rc<StreamNode<S>>: StreamNode<S> {
-    waiting_for_transmission_link: LinkedListLink
+    waiting_for_transmission_link => LinkedListLink
 });
 
 // Intrusive list adapter for managing the list of
 // `waiting_for_retransmission` streams
 intrusive_adapter!(WaitingForRetransmissionAdapter<S> = Rc<StreamNode<S>>: StreamNode<S> {
-    waiting_for_retransmission_link: LinkedListLink
+    waiting_for_retransmission_link => LinkedListLink
 });
 
 // Intrusive list adapter for managing the list of
 // `waiting_for_connection_flow_control_credits` streams
 intrusive_adapter!(WaitingForConnectionFlowControlCreditsAdapter<S> = Rc<StreamNode<S>>: StreamNode<S> {
-    waiting_for_connection_flow_control_credits_link: LinkedListLink
+    waiting_for_connection_flow_control_credits_link => LinkedListLink
 });
 
 // Intrusive list adapter for managing the list of
 // `waiting_for_stream_flow_control_credits` streams
 intrusive_adapter!(WaitingForStreamFlowControlCreditsAdapter<S> = Rc<StreamNode<S>>: StreamNode<S> {
-    waiting_for_stream_flow_control_credits_link: LinkedListLink
+    waiting_for_stream_flow_control_credits_link => LinkedListLink
 });
 
 // Intrusive red black tree adapter for managing all streams in a tree for
 // lookup by Stream ID
 intrusive_adapter!(StreamTreeAdapter<S> = Rc<StreamNode<S>>: StreamNode<S> {
-    tree_link: RBTreeLink
+    tree_link => RBTreeLink
 });
 
 /// A wrapper around a `Stream` implementation which allows to insert the
@@ -112,7 +112,7 @@ impl<'a, S: StreamTrait> KeyAdapter<'a> for StreamTreeAdapter<S> {
 /// This method is only safe to be called if the `StreamNode` is known to be
 /// stored inside a `Rc`.
 unsafe fn stream_node_rc_from_ref<S>(stream_node: &StreamNode<S>) -> Rc<StreamNode<S>> {
-    // In order to be able to to get a `Rc` we construct a temporary `Rc`
+    // In order to be able to get a `Rc` we construct a temporary `Rc`
     // from it using the `Rc::from_raw` API and clone the `Rc`.
     // The temporary `Rc` must be released without calling `drop`,
     // because this would decrement and thereby invalidate the refcount

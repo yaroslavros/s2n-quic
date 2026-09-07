@@ -1,8 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+use clap::Args;
 use lru::LruCache;
-use rand::{Rng as _, RngCore};
+use rand::Rng as _;
 use s2n_codec::encoder::scatter;
 use s2n_quic_core::{
     event::api::Subject,
@@ -13,17 +14,16 @@ use s2n_quic_core::{
     },
     path::RemoteAddress,
 };
-use structopt::StructOpt;
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Args)]
 pub struct Intercept {
-    #[structopt(long)]
+    #[clap(long)]
     havoc_rx: bool,
 
-    #[structopt(long)]
+    #[clap(long)]
     havoc_tx: bool,
 
-    #[structopt(long)]
+    #[clap(long)]
     havoc_port: bool,
 }
 
@@ -43,7 +43,7 @@ impl havoc::Random for Random {
             return start;
         }
 
-        rand::rng().random_range(start..end)
+        rand::random_range(start..end)
     }
 }
 

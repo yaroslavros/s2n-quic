@@ -9,7 +9,7 @@
 use super::*;
 pub(crate) mod metrics;
 pub mod api {
-    #![doc = r" This module contains events that are emitted to the [`Subscriber`](crate::event::Subscriber)"]
+    //! This module contains events that are emitted to the [`Subscriber`](crate::event::Subscriber)
     use super::*;
     #[allow(unused_imports)]
     use crate::event::metrics::aggregate;
@@ -17,13 +17,13 @@ pub mod api {
     pub use traits::Subscriber;
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when a TCP acceptor is started"]
+    /// Emitted when a TCP acceptor is started
     pub struct AcceptorTcpStarted<'a> {
-        #[doc = " The id of the acceptor worker"]
+        /// The id of the acceptor worker
         pub id: usize,
-        #[doc = " The local address of the acceptor"]
+        /// The local address of the acceptor
         pub local_address: SocketAddress<'a>,
-        #[doc = " The backlog size"]
+        /// The backlog size
         pub backlog: usize,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -41,20 +41,20 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when a TCP acceptor completes a single iteration of the event loop"]
+    /// Emitted when a TCP acceptor completes a single iteration of the event loop
     pub struct AcceptorTcpLoopIterationCompleted {
-        #[doc = " The number of streams that are waiting on initial packets"]
+        /// The number of streams that are waiting on initial packets
         pub pending_streams: usize,
-        #[doc = " The number of slots that are not currently processing a stream"]
+        /// The number of slots that are not currently processing a stream
         pub slots_idle: usize,
-        #[doc = " The percentage of slots currently processing streams"]
+        /// The percentage of slots currently processing streams
         pub slot_utilization: f32,
-        #[doc = " The amount of time it took to complete the iteration"]
+        /// The amount of time it took to complete the iteration
         pub processing_duration: core::time::Duration,
-        #[doc = " The computed max sojourn time that is allowed for streams"]
-        #[doc = ""]
-        #[doc = " If streams consume more time than this value to initialize, they"]
-        #[doc = " may potentially be replaced by more recent streams."]
+        /// The computed max sojourn time that is allowed for streams
+        ///
+        /// If streams consume more time than this value to initialize, they
+        /// may potentially be replaced by more recent streams.
         pub max_sojourn_time: core::time::Duration,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -74,9 +74,9 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when a fresh TCP stream is enqueued for processing"]
+    /// Emitted when a fresh TCP stream is enqueued for processing
     pub struct AcceptorTcpFreshEnqueued<'a> {
-        #[doc = " The remote address of the TCP stream"]
+        /// The remote address of the TCP stream
         pub remote_address: SocketAddress<'a>,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -92,13 +92,13 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when a the TCP acceptor has completed a batch of stream enqueues"]
+    /// Emitted when a the TCP acceptor has completed a batch of stream enqueues
     pub struct AcceptorTcpFreshBatchCompleted {
-        #[doc = " The number of fresh TCP streams enqueued in this batch"]
+        /// The number of fresh TCP streams enqueued in this batch
         pub enqueued: usize,
-        #[doc = " The number of fresh TCP streams dropped in this batch due to capacity limits"]
+        /// The number of fresh TCP streams dropped in this batch due to capacity limits
         pub dropped: usize,
-        #[doc = " The number of TCP streams that errored in this batch"]
+        /// The number of TCP streams that errored in this batch
         pub errored: usize,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -116,9 +116,9 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when a TCP stream has been dropped"]
+    /// Emitted when a TCP stream has been dropped
     pub struct AcceptorTcpStreamDropped<'a> {
-        #[doc = " The remote address of the TCP stream"]
+        /// The remote address of the TCP stream
         pub remote_address: SocketAddress<'a>,
         pub reason: AcceptorTcpStreamDropReason,
     }
@@ -136,14 +136,14 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when a TCP stream has been replaced by another stream"]
+    /// Emitted when a TCP stream has been replaced by another stream
     pub struct AcceptorTcpStreamReplaced<'a> {
-        #[doc = " The remote address of the stream being replaced"]
+        /// The remote address of the stream being replaced
         pub remote_address: SocketAddress<'a>,
-        #[doc = " The amount of time that the stream spent in the accept queue before"]
-        #[doc = " being replaced with another"]
+        /// The amount of time that the stream spent in the accept queue before
+        /// being replaced with another
         pub sojourn_time: core::time::Duration,
-        #[doc = " The amount of bytes buffered on the stream"]
+        /// The amount of bytes buffered on the stream
         pub buffer_len: usize,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -161,22 +161,22 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when a full packet has been received on the TCP stream"]
+    /// Emitted when a full packet has been received on the TCP stream
     pub struct AcceptorTcpPacketReceived<'a> {
-        #[doc = " The address of the packet's sender"]
+        /// The address of the packet's sender
         pub remote_address: SocketAddress<'a>,
-        #[doc = " The credential ID of the packet"]
+        /// The credential ID of the packet
         pub credential_id: &'a [u8],
-        #[doc = " The stream ID of the packet"]
+        /// The stream ID of the packet
         pub stream_id: u64,
-        #[doc = " The payload length of the packet"]
+        /// The payload length of the packet
         pub payload_len: usize,
-        #[doc = " If the packet includes the final bytes of the stream"]
+        /// If the packet includes the final bytes of the stream
         pub is_fin: bool,
-        #[doc = " If the packet includes the final offset of the stream"]
+        /// If the packet includes the final offset of the stream
         pub is_fin_known: bool,
-        #[doc = " The amount of time the TCP stream spent in the queue before receiving"]
-        #[doc = " the initial packet"]
+        /// The amount of time the TCP stream spent in the queue before receiving
+        /// the initial packet
         pub sojourn_time: core::time::Duration,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -198,14 +198,116 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when the TCP acceptor received an invalid initial packet"]
-    pub struct AcceptorTcpPacketDropped<'a> {
-        #[doc = " The address of the packet's sender"]
+    /// Emitted when a TLS ClientHello has been recognized on the TCP stream
+    pub struct AcceptorTcpTlsStarted<'a> {
+        /// The address of the packet's sender
         pub remote_address: SocketAddress<'a>,
-        #[doc = " The reason the packet was dropped"]
+        /// The amount of time the TCP stream spent in the queue so far
+        pub sojourn_time: core::time::Duration,
+    }
+    #[cfg(any(test, feature = "testing"))]
+    impl<'a> crate::event::snapshot::Fmt for AcceptorTcpTlsStarted<'a> {
+        fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+            let mut fmt = fmt.debug_struct("AcceptorTcpTlsStarted");
+            fmt.field("remote_address", &self.remote_address);
+            fmt.field("sojourn_time", &self.sojourn_time);
+            fmt.finish()
+        }
+    }
+    impl<'a> Event for AcceptorTcpTlsStarted<'a> {
+        const NAME: &'static str = "acceptor:tcp:tls_started";
+    }
+    #[derive(Clone, Debug)]
+    #[non_exhaustive]
+    /// Emitted when a TLS stream is enqueued to the application accept queue
+    pub struct AcceptorTcpTlsStreamEnqueued<'a> {
+        /// The address of the packet's sender
+        pub remote_address: SocketAddress<'a>,
+        /// The amount of time the TCP stream spent on handshaking before enqueuing to the application
+        /// since being accepted from the kernel
+        pub sojourn_time: core::time::Duration,
+    }
+    #[cfg(any(test, feature = "testing"))]
+    impl<'a> crate::event::snapshot::Fmt for AcceptorTcpTlsStreamEnqueued<'a> {
+        fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+            let mut fmt = fmt.debug_struct("AcceptorTcpTlsStreamEnqueued");
+            fmt.field("remote_address", &self.remote_address);
+            fmt.field("sojourn_time", &self.sojourn_time);
+            fmt.finish()
+        }
+    }
+    impl<'a> Event for AcceptorTcpTlsStreamEnqueued<'a> {
+        const NAME: &'static str = "acceptor:tcp:tls_stream_enqueued";
+    }
+    #[derive(Clone, Debug)]
+    #[non_exhaustive]
+    /// Emitted when a TLS stream is rejected
+    pub struct AcceptorTcpTlsStreamRejected<'a> {
+        /// The address of the packet's sender
+        pub remote_address: SocketAddress<'a>,
+        /// The local address of the server
+        pub local_address: SocketAddress<'a>,
+        /// The amount of time the TCP stream spent on handshaking before being rejected
+        /// since being accepted from the kernel
+        pub sojourn_time: core::time::Duration,
+        /// The error encountered
+        pub error: &'a std::io::Error,
+    }
+    #[cfg(any(test, feature = "testing"))]
+    impl<'a> crate::event::snapshot::Fmt for AcceptorTcpTlsStreamRejected<'a> {
+        fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+            let mut fmt = fmt.debug_struct("AcceptorTcpTlsStreamRejected");
+            fmt.field("remote_address", &self.remote_address);
+            fmt.field("local_address", &self.local_address);
+            fmt.field("sojourn_time", &self.sojourn_time);
+            fmt.field("error", &self.error);
+            fmt.finish()
+        }
+    }
+    impl<'a> Event for AcceptorTcpTlsStreamRejected<'a> {
+        const NAME: &'static str = "acceptor:tcp:tls_stream_rejected";
+    }
+    #[derive(Clone, Debug)]
+    #[non_exhaustive]
+    /// Emitted when a synthetic TLS stream is rejected.
+    ///
+    /// These are TLS streams detected as coming from a synthetic source (e.g., scanner for endpoint
+    /// compliance). Typically failures here are expected at a much higher rate.
+    pub struct AcceptorTcpSyntheticTlsStreamRejected<'a> {
+        /// The address of the packet's sender
+        pub remote_address: SocketAddress<'a>,
+        /// The local address of the server
+        pub local_address: SocketAddress<'a>,
+        /// The amount of time the TCP stream spent on handshaking before being rejected
+        /// since being accepted from the kernel
+        pub sojourn_time: core::time::Duration,
+        /// The error encountered
+        pub error: &'a std::io::Error,
+    }
+    #[cfg(any(test, feature = "testing"))]
+    impl<'a> crate::event::snapshot::Fmt for AcceptorTcpSyntheticTlsStreamRejected<'a> {
+        fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+            let mut fmt = fmt.debug_struct("AcceptorTcpSyntheticTlsStreamRejected");
+            fmt.field("remote_address", &self.remote_address);
+            fmt.field("local_address", &self.local_address);
+            fmt.field("sojourn_time", &self.sojourn_time);
+            fmt.field("error", &self.error);
+            fmt.finish()
+        }
+    }
+    impl<'a> Event for AcceptorTcpSyntheticTlsStreamRejected<'a> {
+        const NAME: &'static str = "acceptor:tcp:tls_synthetic_stream_rejected";
+    }
+    #[derive(Clone, Debug)]
+    #[non_exhaustive]
+    /// Emitted when the TCP acceptor received an invalid initial packet
+    pub struct AcceptorTcpPacketDropped<'a> {
+        /// The address of the packet's sender
+        pub remote_address: SocketAddress<'a>,
+        /// The reason the packet was dropped
         pub reason: AcceptorPacketDropReason,
-        #[doc = " The amount of time the TCP stream spent in the queue before receiving"]
-        #[doc = " an error"]
+        /// The amount of time the TCP stream spent in the queue before receiving
+        /// an error
         pub sojourn_time: core::time::Duration,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -223,17 +325,17 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when the TCP stream has been enqueued for the application"]
+    /// Emitted when the TCP stream has been enqueued for the application
     pub struct AcceptorTcpStreamEnqueued<'a> {
-        #[doc = " The address of the stream's peer"]
+        /// The address of the stream's peer
         pub remote_address: SocketAddress<'a>,
-        #[doc = " The credential ID of the stream"]
+        /// The credential ID of the stream
         pub credential_id: &'a [u8],
-        #[doc = " The ID of the stream"]
+        /// The ID of the stream
         pub stream_id: u64,
-        #[doc = " The amount of time the TCP stream spent in the queue before being enqueued"]
+        /// The amount of time the TCP stream spent in the queue before being enqueued
         pub sojourn_time: core::time::Duration,
-        #[doc = " The number of times the stream was blocked on receiving more data"]
+        /// The number of times the stream was blocked on receiving more data
         pub blocked_count: usize,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -253,16 +355,18 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when the TCP acceptor encounters an IO error"]
+    /// Emitted when the TCP acceptor encounters an IO error
     pub struct AcceptorTcpIoError<'a> {
-        #[doc = " The error encountered"]
+        /// The error encountered
         pub error: &'a std::io::Error,
+        pub source: AcceptorTcpIoErrorSource,
     }
     #[cfg(any(test, feature = "testing"))]
     impl<'a> crate::event::snapshot::Fmt for AcceptorTcpIoError<'a> {
         fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
             let mut fmt = fmt.debug_struct("AcceptorTcpIoError");
             fmt.field("error", &self.error);
+            fmt.field("source", &self.source);
             fmt.finish()
         }
     }
@@ -271,17 +375,17 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when the TCP stream has been sent over a Unix domain socket"]
+    /// Emitted when the TCP stream has been sent over a Unix domain socket
     pub struct AcceptorTcpSocketSent<'a> {
-        #[doc = " The credential ID of the stream"]
+        /// The credential ID of the stream
         pub credential_id: &'a [u8],
-        #[doc = " The ID of the stream"]
+        /// The ID of the stream
         pub stream_id: u64,
-        #[doc = " The amount of time the TCP stream spent in the queue before being sent over Unix domain socket"]
+        /// The amount of time the TCP stream spent in the queue before being sent over Unix domain socket
         pub sojourn_time: core::time::Duration,
-        #[doc = " The number of times the Unix domain socket was blocked on send"]
+        /// The number of times the Unix domain socket was blocked on send
         pub blocked_count: usize,
-        #[doc = " The len of the payload sent over the Unix domain socket"]
+        /// The len of the payload sent over the Unix domain socket
         pub payload_len: usize,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -301,17 +405,17 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when a TCP stream has been received from a Unix domain socket"]
+    /// Emitted when a TCP stream has been received from a Unix domain socket
     pub struct AcceptorTcpSocketReceived<'a> {
-        #[doc = " The address of the stream's peer"]
+        /// The address of the stream's peer
         pub remote_address: SocketAddress<'a>,
-        #[doc = " The credential ID of the stream"]
+        /// The credential ID of the stream
         pub credential_id: &'a [u8],
-        #[doc = " The ID of the stream"]
+        /// The ID of the stream
         pub stream_id: u64,
-        #[doc = " The amount of time taken from socket send to socket receive, including waiting if the kernel queue is full"]
+        /// The amount of time taken from socket send to socket receive, including waiting if the kernel queue is full
         pub transfer_time: core::time::Duration,
-        #[doc = " The len of the payload sent over the Unix domain socket"]
+        /// The len of the payload sent over the Unix domain socket
         pub payload_len: usize,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -331,11 +435,11 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when a UDP acceptor is started"]
+    /// Emitted when a UDP acceptor is started
     pub struct AcceptorUdpStarted<'a> {
-        #[doc = " The id of the acceptor worker"]
+        /// The id of the acceptor worker
         pub id: usize,
-        #[doc = " The local address of the acceptor"]
+        /// The local address of the acceptor
         pub local_address: SocketAddress<'a>,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -352,11 +456,11 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when a UDP datagram is received by the acceptor"]
+    /// Emitted when a UDP datagram is received by the acceptor
     pub struct AcceptorUdpDatagramReceived<'a> {
-        #[doc = " The address of the datagram's sender"]
+        /// The address of the datagram's sender
         pub remote_address: SocketAddress<'a>,
-        #[doc = " The len of the datagram"]
+        /// The len of the datagram
         pub len: usize,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -373,23 +477,23 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when the UDP acceptor parsed a packet contained in a datagram"]
+    /// Emitted when the UDP acceptor parsed a packet contained in a datagram
     pub struct AcceptorUdpPacketReceived<'a> {
-        #[doc = " The address of the packet's sender"]
+        /// The address of the packet's sender
         pub remote_address: SocketAddress<'a>,
-        #[doc = " The credential ID of the packet"]
+        /// The credential ID of the packet
         pub credential_id: &'a [u8],
-        #[doc = " The stream ID of the packet"]
+        /// The stream ID of the packet
         pub stream_id: u64,
-        #[doc = " The payload length of the packet"]
+        /// The payload length of the packet
         pub payload_len: usize,
-        #[doc = " If the packets is a zero offset in the stream"]
+        /// If the packets is a zero offset in the stream
         pub is_zero_offset: bool,
-        #[doc = " If the packet is a retransmission"]
+        /// If the packet is a retransmission
         pub is_retransmission: bool,
-        #[doc = " If the packet includes the final bytes of the stream"]
+        /// If the packet includes the final bytes of the stream
         pub is_fin: bool,
-        #[doc = " If the packet includes the final offset of the stream"]
+        /// If the packet includes the final offset of the stream
         pub is_fin_known: bool,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -412,11 +516,11 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when the UDP acceptor received an invalid initial packet"]
+    /// Emitted when the UDP acceptor received an invalid initial packet
     pub struct AcceptorUdpPacketDropped<'a> {
-        #[doc = " The address of the packet's sender"]
+        /// The address of the packet's sender
         pub remote_address: SocketAddress<'a>,
-        #[doc = " The reason the packet was dropped"]
+        /// The reason the packet was dropped
         pub reason: AcceptorPacketDropReason,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -433,13 +537,13 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when the UDP stream has been enqueued for the application"]
+    /// Emitted when the UDP stream has been enqueued for the application
     pub struct AcceptorUdpStreamEnqueued<'a> {
-        #[doc = " The address of the stream's peer"]
+        /// The address of the stream's peer
         pub remote_address: SocketAddress<'a>,
-        #[doc = " The credential ID of the stream"]
+        /// The credential ID of the stream
         pub credential_id: &'a [u8],
-        #[doc = " The ID of the stream"]
+        /// The ID of the stream
         pub stream_id: u64,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -457,9 +561,9 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when the UDP acceptor encounters an IO error"]
+    /// Emitted when the UDP acceptor encounters an IO error
     pub struct AcceptorUdpIoError<'a> {
-        #[doc = " The error encountered"]
+        /// The error encountered
         pub error: &'a std::io::Error,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -475,16 +579,16 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when a stream has been pruned"]
+    /// Emitted when a stream has been pruned
     pub struct AcceptorStreamPruned<'a> {
-        #[doc = " The remote address of the stream"]
+        /// The remote address of the stream
         pub remote_address: SocketAddress<'a>,
-        #[doc = " The credential ID of the stream"]
+        /// The credential ID of the stream
         pub credential_id: &'a [u8],
-        #[doc = " The ID of the stream"]
+        /// The ID of the stream
         pub stream_id: u64,
-        #[doc = " The amount of time that the stream spent in the accept queue before"]
-        #[doc = " being pruned"]
+        /// The amount of time that the stream spent in the accept queue before
+        /// being pruned
         pub sojourn_time: core::time::Duration,
         pub reason: AcceptorStreamPruneReason,
     }
@@ -505,17 +609,19 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when a stream has been dequeued by the application"]
+    /// Emitted when a stream has been dequeued by the application
     pub struct AcceptorStreamDequeued<'a> {
-        #[doc = " The remote address of the stream"]
+        /// The remote address of the stream
         pub remote_address: SocketAddress<'a>,
-        #[doc = " The credential ID of the stream"]
+        /// The credential ID of the stream
         pub credential_id: &'a [u8],
-        #[doc = " The ID of the stream"]
+        /// The ID of the stream
         pub stream_id: u64,
-        #[doc = " The amount of time that the stream spent in the accept queue before"]
-        #[doc = " being dequeued"]
+        /// The amount of time that the stream spent in dcQUIC before being dequeued
         pub sojourn_time: core::time::Duration,
+        /// The amount of time that the stream spent in the queue to the application before being
+        /// dequeued
+        pub queue_sojourn_time: core::time::Duration,
     }
     #[cfg(any(test, feature = "testing"))]
     impl<'a> crate::event::snapshot::Fmt for AcceptorStreamDequeued<'a> {
@@ -525,6 +631,7 @@ pub mod api {
             fmt.field("credential_id", &"[HIDDEN]");
             fmt.field("stream_id", &self.stream_id);
             fmt.field("sojourn_time", &self.sojourn_time);
+            fmt.field("queue_sojourn_time", &self.queue_sojourn_time);
             fmt.finish()
         }
     }
@@ -535,10 +642,10 @@ pub mod api {
     #[non_exhaustive]
     pub enum AcceptorTcpStreamDropReason {
         #[non_exhaustive]
-        #[doc = " There were more streams in the TCP backlog than the userspace queue can store"]
+        /// There were more streams in the TCP backlog than the userspace queue can store
         FreshQueueAtCapacity {},
         #[non_exhaustive]
-        #[doc = " There are no available slots for processing"]
+        /// There are no available slots for processing
         SlotsAtCapacity {},
     }
     impl aggregate::AsVariant for AcceptorTcpStreamDropReason {
@@ -559,6 +666,93 @@ pub mod api {
             match self {
                 Self::FreshQueueAtCapacity { .. } => 0usize,
                 Self::SlotsAtCapacity { .. } => 1usize,
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    #[non_exhaustive]
+    pub enum AcceptorTcpIoErrorSource {
+        #[non_exhaustive]
+        /// Problem during accept of the TCP socket
+        Accept {},
+        #[non_exhaustive]
+        /// Problem writing to the TCP socket
+        Send {},
+        #[non_exhaustive]
+        /// Kernel originating from sending the TCP socket over UDS
+        UnixSend {},
+        #[non_exhaustive]
+        /// Problem reading from the TCP socket
+        Recv {},
+        #[non_exhaustive]
+        /// Something within dcQUIC failed related to the remote state or network contents (e.g.,
+        /// parsing the packet)
+        Remote {},
+        #[non_exhaustive]
+        /// Something in the local application state was wrong.
+        Local {},
+        #[non_exhaustive]
+        /// Unknown path secret for remote stream.
+        UnknownPathSecret {},
+        #[non_exhaustive]
+        /// Something went wrong that we didn't expect to happen.
+        /// This is used for failures that aren't expected to relate to dcQUIC state at all.
+        System {},
+    }
+    impl aggregate::AsVariant for AcceptorTcpIoErrorSource {
+        const VARIANTS: &'static [aggregate::info::Variant] = &[
+            aggregate::info::variant::Builder {
+                name: aggregate::info::Str::new("ACCEPT\0"),
+                id: 0usize,
+            }
+            .build(),
+            aggregate::info::variant::Builder {
+                name: aggregate::info::Str::new("SEND\0"),
+                id: 1usize,
+            }
+            .build(),
+            aggregate::info::variant::Builder {
+                name: aggregate::info::Str::new("UNIX_SEND\0"),
+                id: 2usize,
+            }
+            .build(),
+            aggregate::info::variant::Builder {
+                name: aggregate::info::Str::new("RECV\0"),
+                id: 3usize,
+            }
+            .build(),
+            aggregate::info::variant::Builder {
+                name: aggregate::info::Str::new("REMOTE\0"),
+                id: 4usize,
+            }
+            .build(),
+            aggregate::info::variant::Builder {
+                name: aggregate::info::Str::new("LOCAL\0"),
+                id: 5usize,
+            }
+            .build(),
+            aggregate::info::variant::Builder {
+                name: aggregate::info::Str::new("UNKNOWN_PATH_SECRET\0"),
+                id: 6usize,
+            }
+            .build(),
+            aggregate::info::variant::Builder {
+                name: aggregate::info::Str::new("SYSTEM\0"),
+                id: 7usize,
+            }
+            .build(),
+        ];
+        #[inline]
+        fn variant_idx(&self) -> usize {
+            match self {
+                Self::Accept { .. } => 0usize,
+                Self::Send { .. } => 1usize,
+                Self::UnixSend { .. } => 2usize,
+                Self::Recv { .. } => 3usize,
+                Self::Remote { .. } => 4usize,
+                Self::Local { .. } => 5usize,
+                Self::UnknownPathSecret { .. } => 6usize,
+                Self::System { .. } => 7usize,
             }
         }
     }
@@ -677,13 +871,13 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamWriteFlushed {
-        #[doc = " The number of bytes that the application tried to write"]
+        /// The number of bytes that the application tried to write
         pub provided_len: usize,
-        #[doc = " The amount that was written"]
+        /// The amount that was written
         pub committed_len: usize,
-        #[doc = " The amount of time it took to process the write request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and encryption overhead"]
+        /// The amount of time it took to process the write request
+        ///
+        /// Note that this includes both any syscall and encryption overhead
         pub processing_duration: core::time::Duration,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -702,13 +896,13 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamWriteFinFlushed {
-        #[doc = " The number of bytes that the application tried to write"]
+        /// The number of bytes that the application tried to write
         pub provided_len: usize,
-        #[doc = " The amount that was written"]
+        /// The amount that was written
         pub committed_len: usize,
-        #[doc = " The amount of time it took to process the write request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and encryption overhead"]
+        /// The amount of time it took to process the write request
+        ///
+        /// Note that this includes both any syscall and encryption overhead
         pub processing_duration: core::time::Duration,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -727,13 +921,13 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamWriteBlocked {
-        #[doc = " The number of bytes that the application tried to write"]
+        /// The number of bytes that the application tried to write
         pub provided_len: usize,
-        #[doc = " Indicates that the write was the final offset of the stream"]
+        /// Indicates that the write was the final offset of the stream
         pub is_fin: bool,
-        #[doc = " The amount of time it took to process the write request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and encryption overhead"]
+        /// The amount of time it took to process the write request
+        ///
+        /// Note that this includes both any syscall and encryption overhead
         pub processing_duration: core::time::Duration,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -752,15 +946,15 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamWriteErrored {
-        #[doc = " The number of bytes that the application tried to write"]
+        /// The number of bytes that the application tried to write
         pub provided_len: usize,
-        #[doc = " Indicates that the write was the final offset of the stream"]
+        /// Indicates that the write was the final offset of the stream
         pub is_fin: bool,
-        #[doc = " The amount of time it took to process the write request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and encryption overhead"]
+        /// The amount of time it took to process the write request
+        ///
+        /// Note that this includes both any syscall and encryption overhead
         pub processing_duration: core::time::Duration,
-        #[doc = " The system `errno` from the returned error"]
+        /// The system `errno` from the returned error
         pub errno: Option<i32>,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -796,7 +990,7 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamWriteAllocated {
-        #[doc = " The number of bytes that we allocated."]
+        /// The number of bytes that we allocated.
         pub allocated_len: usize,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -813,9 +1007,9 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamWriteShutdown {
-        #[doc = " The number of bytes in the send buffer at the time of shutdown"]
+        /// The number of bytes in the send buffer at the time of shutdown
         pub buffer_len: usize,
-        #[doc = " If the stream required a background task to drive the stream shutdown"]
+        /// If the stream required a background task to drive the stream shutdown
         pub background: bool,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -833,9 +1027,9 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamWriteSocketFlushed {
-        #[doc = " The number of bytes that the stream tried to write to the socket"]
+        /// The number of bytes that the stream tried to write to the socket
         pub provided_len: usize,
-        #[doc = " The amount that was written"]
+        /// The amount that was written
         pub committed_len: usize,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -853,7 +1047,7 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamWriteSocketBlocked {
-        #[doc = " The number of bytes that the stream tried to write to the socket"]
+        /// The number of bytes that the stream tried to write to the socket
         pub provided_len: usize,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -870,9 +1064,9 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamWriteSocketErrored {
-        #[doc = " The number of bytes that the stream tried to write to the socket"]
+        /// The number of bytes that the stream tried to write to the socket
         pub provided_len: usize,
-        #[doc = " The system `errno` from the returned error"]
+        /// The system `errno` from the returned error
         pub errno: Option<i32>,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -890,13 +1084,13 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamReadFlushed {
-        #[doc = " The number of bytes that the application tried to read"]
+        /// The number of bytes that the application tried to read
         pub capacity: usize,
-        #[doc = " The amount that was read into the provided buffer"]
+        /// The amount that was read into the provided buffer
         pub committed_len: usize,
-        #[doc = " The amount of time it took to process the read request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and decryption overhead"]
+        /// The amount of time it took to process the read request
+        ///
+        /// Note that this includes both any syscall and decryption overhead
         pub processing_duration: core::time::Duration,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -915,11 +1109,11 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamReadFinFlushed {
-        #[doc = " The number of bytes that the application tried to read"]
+        /// The number of bytes that the application tried to read
         pub capacity: usize,
-        #[doc = " The amount of time it took to process the read request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and decryption overhead"]
+        /// The amount of time it took to process the read request
+        ///
+        /// Note that this includes both any syscall and decryption overhead
         pub processing_duration: core::time::Duration,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -937,11 +1131,11 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamReadBlocked {
-        #[doc = " The number of bytes that the application tried to read"]
+        /// The number of bytes that the application tried to read
         pub capacity: usize,
-        #[doc = " The amount of time it took to process the read request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and decryption overhead"]
+        /// The amount of time it took to process the read request
+        ///
+        /// Note that this includes both any syscall and decryption overhead
         pub processing_duration: core::time::Duration,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -959,13 +1153,13 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamReadErrored {
-        #[doc = " The number of bytes that the application tried to read"]
+        /// The number of bytes that the application tried to read
         pub capacity: usize,
-        #[doc = " The amount of time it took to process the read request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and decryption overhead"]
+        /// The amount of time it took to process the read request
+        ///
+        /// Note that this includes both any syscall and decryption overhead
         pub processing_duration: core::time::Duration,
-        #[doc = " The system `errno` from the returned error"]
+        /// The system `errno` from the returned error
         pub errno: Option<i32>,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -1000,7 +1194,7 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamReadShutdown {
-        #[doc = " If the stream required a background task to drive the stream shutdown"]
+        /// If the stream required a background task to drive the stream shutdown
         pub background: bool,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -1017,9 +1211,9 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamReadSocketFlushed {
-        #[doc = " The number of bytes that the stream tried to read from the socket"]
+        /// The number of bytes that the stream tried to read from the socket
         pub capacity: usize,
-        #[doc = " The amount that was read into the provided buffer"]
+        /// The amount that was read into the provided buffer
         pub committed_len: usize,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -1037,7 +1231,7 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamReadSocketBlocked {
-        #[doc = " The number of bytes that the stream tried to read from the socket"]
+        /// The number of bytes that the stream tried to read from the socket
         pub capacity: usize,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -1054,9 +1248,9 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamReadSocketErrored {
-        #[doc = " The number of bytes that the stream tried to read from the socket"]
+        /// The number of bytes that the stream tried to read from the socket
         pub capacity: usize,
-        #[doc = " The system `errno` from the returned error"]
+        /// The system `errno` from the returned error
         pub errno: Option<i32>,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -1074,16 +1268,16 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamDecryptPacket {
-        #[doc = " Did we decrypt the packet in place, or were we able to merge the copy and decrypt?"]
+        /// Did we decrypt the packet in place, or were we able to merge the copy and decrypt?
         pub decrypted_in_place: bool,
-        #[doc = " The number of bytes we were forced to copy after decrypting in the packet buffer."]
-        #[doc = ""]
-        #[doc = " This means that the application buffer was insufficiently large to allow us to directly"]
-        #[doc = " copy as part of the decrypt. This can be non-zero even with decrypted_in_place=false, if we"]
-        #[doc = " decrypted into the reassembly buffer. Right now it doesn't take into account zero-copy"]
-        #[doc = " reads from the reassembly buffer (e.g., with specialized Bytes)."]
+        /// The number of bytes we were forced to copy after decrypting in the packet buffer.
+        ///
+        /// This means that the application buffer was insufficiently large to allow us to directly
+        /// copy as part of the decrypt. This can be non-zero even with decrypted_in_place=false, if we
+        /// decrypted into the reassembly buffer. Right now it doesn't take into account zero-copy
+        /// reads from the reassembly buffer (e.g., with specialized Bytes).
         pub forced_copy: usize,
-        #[doc = " The application buffer size that would avoid copies."]
+        /// The application buffer size that would avoid copies.
         pub required_application_buffer: usize,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -1104,7 +1298,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Tracks stream connect where dcQUIC owns the TCP connect()."]
+    /// Tracks stream connect where dcQUIC owns the TCP connect().
     pub struct StreamTcpConnect {
         pub error: bool,
         pub latency: core::time::Duration,
@@ -1123,7 +1317,52 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Tracks stream connect where dcQUIC owns the TCP connect()."]
+    /// Tracks TLS stream establishment.
+    pub struct StreamTlsConnect<'a> {
+        pub error: bool,
+        /// The remote address being connected to
+        pub remote_address: SocketAddress<'a>,
+        pub tcp_latency: core::time::Duration,
+        pub tls_latency: core::time::Duration,
+    }
+    #[cfg(any(test, feature = "testing"))]
+    impl<'a> crate::event::snapshot::Fmt for StreamTlsConnect<'a> {
+        fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+            let mut fmt = fmt.debug_struct("StreamTlsConnect");
+            fmt.field("error", &self.error);
+            fmt.field("remote_address", &self.remote_address);
+            fmt.field("tcp_latency", &self.tcp_latency);
+            fmt.field("tls_latency", &self.tls_latency);
+            fmt.finish()
+        }
+    }
+    impl<'a> Event for StreamTlsConnect<'a> {
+        const NAME: &'static str = "stream:tls_connect";
+    }
+    #[derive(Clone, Debug)]
+    #[non_exhaustive]
+    /// Emitted when a TLS stream connect fails.
+    pub struct StreamTlsConnectError<'a> {
+        /// The remote address being connected to
+        pub remote_address: SocketAddress<'a>,
+        /// The error encountered
+        pub error: &'a std::io::Error,
+    }
+    #[cfg(any(test, feature = "testing"))]
+    impl<'a> crate::event::snapshot::Fmt for StreamTlsConnectError<'a> {
+        fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+            let mut fmt = fmt.debug_struct("StreamTlsConnectError");
+            fmt.field("remote_address", &self.remote_address);
+            fmt.field("error", &self.error);
+            fmt.finish()
+        }
+    }
+    impl<'a> Event for StreamTlsConnectError<'a> {
+        const NAME: &'static str = "stream:tls_connect_error";
+    }
+    #[derive(Clone, Debug)]
+    #[non_exhaustive]
+    /// Tracks stream connect where dcQUIC owns the TCP connect().
     pub struct StreamConnect {
         pub error: bool,
         pub tcp_success: MaybeBoolCounter,
@@ -1144,17 +1383,19 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Tracks stream connect errors."]
-    #[doc = ""]
-    #[doc = " Currently only emitted in cases where dcQUIC owns the TCP connect too."]
+    /// Tracks stream connect errors.
+    ///
+    /// Currently only emitted in cases where dcQUIC owns the TCP connect too.
     pub struct StreamConnectError {
         pub reason: StreamTcpConnectErrorReason,
+        pub latency: core::time::Duration,
     }
     #[cfg(any(test, feature = "testing"))]
     impl crate::event::snapshot::Fmt for StreamConnectError {
         fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
             let mut fmt = fmt.debug_struct("StreamConnectError");
             fmt.field("reason", &self.reason);
+            fmt.field("latency", &self.latency);
             fmt.finish()
         }
     }
@@ -1164,15 +1405,15 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamPacketTransmitted {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The size of the application data in the packet"]
+        /// The size of the application data in the packet
         pub payload_len: usize,
-        #[doc = " The packet number of the transmitted packet"]
+        /// The packet number of the transmitted packet
         pub packet_number: u64,
-        #[doc = " The offset in the stream of the first byte in the packet"]
+        /// The offset in the stream of the first byte in the packet
         pub stream_offset: u64,
-        #[doc = " Whether the packet contained the final bytes of the stream"]
+        /// Whether the packet contained the final bytes of the stream
         pub is_fin: bool,
         pub is_retransmission: bool,
     }
@@ -1195,9 +1436,9 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamProbeTransmitted {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The packet number of the transmitted packet"]
+        /// The packet number of the transmitted packet
         pub packet_number: u64,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -1215,15 +1456,15 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamPacketReceived {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The size of the application data in the packet"]
+        /// The size of the application data in the packet
         pub payload_len: usize,
-        #[doc = " The packet number of the received packet"]
+        /// The packet number of the received packet
         pub packet_number: u64,
-        #[doc = " The offset in the stream of the first byte in the packet"]
+        /// The offset in the stream of the first byte in the packet
         pub stream_offset: u64,
-        #[doc = " Whether the packet contained the final bytes of the stream"]
+        /// Whether the packet contained the final bytes of the stream
         pub is_fin: bool,
         pub is_retransmission: bool,
     }
@@ -1245,19 +1486,19 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Indicates that a packet was lost on a stream"]
+    /// Indicates that a packet was lost on a stream
     pub struct StreamPacketLost {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The size of the application data in the packet"]
+        /// The size of the application data in the packet
         pub payload_len: usize,
-        #[doc = " The packet number of the lost packet"]
+        /// The packet number of the lost packet
         pub packet_number: u64,
-        #[doc = " The offset in the stream of the first byte in the packet"]
+        /// The offset in the stream of the first byte in the packet
         pub stream_offset: u64,
-        #[doc = " The time the packet was originally sent"]
+        /// The time the packet was originally sent
         pub time_sent: Timestamp,
-        #[doc = " The amount of time between when the packet was sent and when it was detected as lost"]
+        /// The amount of time between when the packet was sent and when it was detected as lost
         pub lifetime: core::time::Duration,
         pub is_retransmission: bool,
     }
@@ -1280,19 +1521,19 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Indicates that a packet was acknowledged on a stream"]
+    /// Indicates that a packet was acknowledged on a stream
     pub struct StreamPacketAcked {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The size of the application data in the packet"]
+        /// The size of the application data in the packet
         pub payload_len: usize,
-        #[doc = " The packet number of the acknowledged packet"]
+        /// The packet number of the acknowledged packet
         pub packet_number: u64,
-        #[doc = " The offset in the stream of the first byte in the packet"]
+        /// The offset in the stream of the first byte in the packet
         pub stream_offset: u64,
-        #[doc = " The time the packet was originally sent"]
+        /// The time the packet was originally sent
         pub time_sent: Timestamp,
-        #[doc = " The amount of time between when the packet was sent and when it was detected as lost"]
+        /// The amount of time between when the packet was sent and when it was detected as lost
         pub lifetime: core::time::Duration,
         pub is_retransmission: bool,
     }
@@ -1315,17 +1556,17 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Indicates that a packet was retransmitted on a stream but was not actually lost"]
+    /// Indicates that a packet was retransmitted on a stream but was not actually lost
     pub struct StreamPacketSpuriouslyRetransmitted {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The size of the application data in the packet"]
+        /// The size of the application data in the packet
         pub payload_len: usize,
-        #[doc = " The packet number of the packet"]
+        /// The packet number of the packet
         pub packet_number: u64,
-        #[doc = " The offset in the stream of the first byte in the packet"]
+        /// The offset in the stream of the first byte in the packet
         pub stream_offset: u64,
-        #[doc = " Whether the packet contained the final bytes of the stream"]
+        /// Whether the packet contained the final bytes of the stream
         pub is_fin: bool,
         pub is_retransmission: bool,
     }
@@ -1347,11 +1588,11 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Indicates that the stream received additional flow control credits"]
+    /// Indicates that the stream received additional flow control credits
     pub struct StreamMaxDataReceived {
-        #[doc = " The number of bytes of flow control credits received"]
+        /// The number of bytes of flow control credits received
         pub increase: u64,
-        #[doc = " The new offset of the stream"]
+        /// The new offset of the stream
         pub new_max_data: u64,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -1369,11 +1610,11 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamControlPacketTransmitted {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The size of the control data in the packet"]
+        /// The size of the control data in the packet
         pub control_data_len: usize,
-        #[doc = " The packet number of the received control packet"]
+        /// The packet number of the received control packet
         pub packet_number: u64,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -1392,13 +1633,13 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct StreamControlPacketReceived {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The size of the control data in the packet"]
+        /// The size of the control data in the packet
         pub control_data_len: usize,
-        #[doc = " The packet number of the received control packet"]
+        /// The packet number of the received control packet
         pub packet_number: u64,
-        #[doc = " Whether the packet was successfully authenticated"]
+        /// Whether the packet was successfully authenticated
         pub is_authenticated: bool,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -1419,7 +1660,7 @@ pub mod api {
     #[non_exhaustive]
     pub struct StreamReceiverErrored {
         pub error: crate::stream::recv::Error,
-        #[doc = " The location where the error originated"]
+        /// The location where the error originated
         pub source: s2n_quic_core::endpoint::Location,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -1438,7 +1679,7 @@ pub mod api {
     #[non_exhaustive]
     pub struct StreamSenderErrored {
         pub error: crate::stream::send::Error,
-        #[doc = " The location where the error originated"]
+        /// The location where the error originated
         pub source: s2n_quic_core::endpoint::Location,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -1455,6 +1696,23 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
+    /// Emitted when a handshake packet is rejected due to an invalid field value
+    pub struct StreamHandshakePacketRejected {
+        pub reason: StreamHandshakePacketRejectedReason,
+    }
+    #[cfg(any(test, feature = "testing"))]
+    impl crate::event::snapshot::Fmt for StreamHandshakePacketRejected {
+        fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+            let mut fmt = fmt.debug_struct("StreamHandshakePacketRejected");
+            fmt.field("reason", &self.reason);
+            fmt.finish()
+        }
+    }
+    impl Event for StreamHandshakePacketRejected {
+        const NAME: &'static str = "stream:handshake_packet_rejected";
+    }
+    #[derive(Clone, Debug)]
+    #[non_exhaustive]
     pub struct ConnectionClosed {}
     #[cfg(any(test, feature = "testing"))]
     impl crate::event::snapshot::Fmt for ConnectionClosed {
@@ -1468,8 +1726,8 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Used for cases where we are racing multiple futures and exit if any of them fail, and so"]
-    #[doc = " recording success is not just a boolean value."]
+    /// Used for cases where we are racing multiple futures and exit if any of them fail, and so
+    /// recording success is not just a boolean value.
     pub enum MaybeBoolCounter {
         #[non_exhaustive]
         Success {},
@@ -1507,20 +1765,34 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Note that there's no guarantee of a particular reason if multiple reasons ~simultaneously"]
-    #[doc = " terminate the connection."]
+    /// Note that there's no guarantee of a particular reason if multiple reasons ~simultaneously
+    /// terminate the connection.
     pub enum StreamTcpConnectErrorReason {
         #[non_exhaustive]
-        #[doc = " TCP connect failed."]
+        /// TCP connect failed.
         TcpConnect {},
         #[non_exhaustive]
-        #[doc = " Handshake failed to produce credentials."]
+        /// Handshake failed to produce credentials.
         Handshake {},
         #[non_exhaustive]
-        #[doc = " When the connect future is dropped prior to returning any result."]
-        #[doc = ""]
-        #[doc = " Usually indicates a timeout in the application."]
-        Aborted {},
+        /// Emitted when no psk was cached for the peer.
+        PeerPskMissing {},
+        #[non_exhaustive]
+        /// When the connect future is dropped prior to returning any result.
+        ///
+        /// This means the TCP connect succeeded, but the handshake hasn't yet by the time the connect
+        /// future was dropped.
+        AbortedPendingHandshake {},
+        #[non_exhaustive]
+        /// When the connect future is dropped prior to returning any result.
+        ///
+        /// The handshake succeeded (or wasn't needed), but the TCP connect hasn't yet finished.
+        AbortedPendingConnect {},
+        #[non_exhaustive]
+        /// When the connect future is dropped prior to returning any result.
+        ///
+        /// Neither the TCP connect or handshake have finished yet.
+        AbortedPendingBoth {},
     }
     impl aggregate::AsVariant for StreamTcpConnectErrorReason {
         const VARIANTS: &'static [aggregate::info::Variant] = &[
@@ -1535,8 +1807,23 @@ pub mod api {
             }
             .build(),
             aggregate::info::variant::Builder {
-                name: aggregate::info::Str::new("ABORTED\0"),
+                name: aggregate::info::Str::new("PEER_PSK_MISSING\0"),
                 id: 2usize,
+            }
+            .build(),
+            aggregate::info::variant::Builder {
+                name: aggregate::info::Str::new("ABORTED_PENDING_HANDSHAKE\0"),
+                id: 3usize,
+            }
+            .build(),
+            aggregate::info::variant::Builder {
+                name: aggregate::info::Str::new("ABORTED_PENDING_CONNECT\0"),
+                id: 4usize,
+            }
+            .build(),
+            aggregate::info::variant::Builder {
+                name: aggregate::info::Str::new("ABORTED_PENDING_BOTH\0"),
+                id: 5usize,
             }
             .build(),
         ];
@@ -1545,7 +1832,31 @@ pub mod api {
             match self {
                 Self::TcpConnect { .. } => 0usize,
                 Self::Handshake { .. } => 1usize,
-                Self::Aborted { .. } => 2usize,
+                Self::PeerPskMissing { .. } => 2usize,
+                Self::AbortedPendingHandshake { .. } => 3usize,
+                Self::AbortedPendingConnect { .. } => 4usize,
+                Self::AbortedPendingBoth { .. } => 5usize,
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    #[non_exhaustive]
+    pub enum StreamHandshakePacketRejectedReason {
+        #[non_exhaustive]
+        /// The queue_id exceeds the maximum encodable value
+        InvalidQueueId {},
+    }
+    impl aggregate::AsVariant for StreamHandshakePacketRejectedReason {
+        const VARIANTS: &'static [aggregate::info::Variant] =
+            &[aggregate::info::variant::Builder {
+                name: aggregate::info::Str::new("INVALID_QUEUE_ID\0"),
+                id: 0usize,
+            }
+            .build()];
+        #[inline]
+        fn variant_idx(&self) -> usize {
+            match self {
+                Self::InvalidQueueId { .. } => 0usize,
             }
         }
     }
@@ -1573,8 +1884,25 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
+    /// Emitted when the DC handshake confirmation or MTU probing times out
+    pub struct DcConnectionTimeout<'a> {
+        pub peer_address: SocketAddress<'a>,
+    }
+    #[cfg(any(test, feature = "testing"))]
+    impl<'a> crate::event::snapshot::Fmt for DcConnectionTimeout<'a> {
+        fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+            let mut fmt = fmt.debug_struct("DcConnectionTimeout");
+            fmt.field("peer_address", &self.peer_address);
+            fmt.finish()
+        }
+    }
+    impl<'a> Event for DcConnectionTimeout<'a> {
+        const NAME: &'static str = "dc:connection_timeout";
+    }
+    #[derive(Clone, Debug)]
+    #[non_exhaustive]
     pub struct PathSecretMapInitialized {
-        #[doc = " The capacity of the path secret map"]
+        /// The capacity of the path secret map
         pub capacity: usize,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -1591,9 +1919,9 @@ pub mod api {
     #[derive(Clone, Debug)]
     #[non_exhaustive]
     pub struct PathSecretMapUninitialized {
-        #[doc = " The capacity of the path secret map"]
+        /// The capacity of the path secret map
         pub capacity: usize,
-        #[doc = " The number of entries in the map"]
+        /// The number of entries in the map
         pub entries: usize,
         pub lifetime: core::time::Duration,
     }
@@ -1612,7 +1940,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when a background handshake is requested"]
+    /// Emitted when a background handshake is requested
     pub struct PathSecretMapBackgroundHandshakeRequested<'a> {
         pub peer_address: SocketAddress<'a>,
     }
@@ -1629,7 +1957,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when the entry is inserted into the path secret map"]
+    /// Emitted when the entry is inserted into the path secret map
     pub struct PathSecretMapEntryInserted<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -1648,7 +1976,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when the entry is considered ready for use"]
+    /// Emitted when the entry is considered ready for use
     pub struct PathSecretMapEntryReady<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -1667,11 +1995,13 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an entry is replaced by a new one for the same `peer_address`"]
+    /// Emitted when an entry is replaced by a new one for the same `peer_address`
     pub struct PathSecretMapEntryReplaced<'a> {
         pub peer_address: SocketAddress<'a>,
         pub new_credential_id: &'a [u8],
         pub previous_credential_id: &'a [u8],
+        /// Time since insertion of the replaced entry
+        pub replaced_age: core::time::Duration,
     }
     #[cfg(any(test, feature = "testing"))]
     impl<'a> crate::event::snapshot::Fmt for PathSecretMapEntryReplaced<'a> {
@@ -1680,6 +2010,7 @@ pub mod api {
             fmt.field("peer_address", &self.peer_address);
             fmt.field("new_credential_id", &"[HIDDEN]");
             fmt.field("previous_credential_id", &"[HIDDEN]");
+            fmt.field("replaced_age", &self.replaced_age);
             fmt.finish()
         }
     }
@@ -1688,12 +2019,14 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an entry is evicted due to running out of space"]
+    /// Emitted when an entry is evicted due to running out of space
     pub struct PathSecretMapIdEntryEvicted<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
-        #[doc = " Time since insertion of this entry"]
+        /// Time since insertion of this entry
         pub age: core::time::Duration,
+        pub time_since_last_accessed: core::time::Duration,
+        pub reason: EvictionReason,
     }
     #[cfg(any(test, feature = "testing"))]
     impl<'a> crate::event::snapshot::Fmt for PathSecretMapIdEntryEvicted<'a> {
@@ -1701,7 +2034,9 @@ pub mod api {
             let mut fmt = fmt.debug_struct("PathSecretMapIdEntryEvicted");
             fmt.field("peer_address", &self.peer_address);
             fmt.field("credential_id", &"[HIDDEN]");
-            fmt.field("age", &self.age);
+            fmt.field("age", &"[HIDDEN]");
+            fmt.field("time_since_last_accessed", &self.time_since_last_accessed);
+            fmt.field("reason", &self.reason);
             fmt.finish()
         }
     }
@@ -1710,12 +2045,14 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an entry is evicted due to running out of space"]
+    /// Emitted when an entry is evicted due to running out of space
     pub struct PathSecretMapAddressEntryEvicted<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
-        #[doc = " Time since insertion of this entry"]
+        /// Time since insertion of this entry
         pub age: core::time::Duration,
+        pub time_since_last_accessed: core::time::Duration,
+        pub reason: EvictionReason,
     }
     #[cfg(any(test, feature = "testing"))]
     impl<'a> crate::event::snapshot::Fmt for PathSecretMapAddressEntryEvicted<'a> {
@@ -1724,6 +2061,8 @@ pub mod api {
             fmt.field("peer_address", &self.peer_address);
             fmt.field("credential_id", &"[HIDDEN]");
             fmt.field("age", &self.age);
+            fmt.field("time_since_last_accessed", &self.time_since_last_accessed);
+            fmt.field("reason", &self.reason);
             fmt.finish()
         }
     }
@@ -1732,7 +2071,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an UnknownPathSecret packet was sent"]
+    /// Emitted when an UnknownPathSecret packet was sent
     pub struct UnknownPathSecretPacketSent<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -1751,7 +2090,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an UnknownPathSecret packet was received"]
+    /// Emitted when an UnknownPathSecret packet was received
     pub struct UnknownPathSecretPacketReceived<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -1770,10 +2109,14 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an UnknownPathSecret packet was authentic and processed"]
+    /// Emitted when an UnknownPathSecret packet was authentic and processed
     pub struct UnknownPathSecretPacketAccepted<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
+        /// The age of the entry the peer indicated it doesn't know about.
+        pub age: core::time::Duration,
+        pub evicted: bool,
+        pub scheduled_handshake: bool,
     }
     #[cfg(any(test, feature = "testing"))]
     impl<'a> crate::event::snapshot::Fmt for UnknownPathSecretPacketAccepted<'a> {
@@ -1781,6 +2124,9 @@ pub mod api {
             let mut fmt = fmt.debug_struct("UnknownPathSecretPacketAccepted");
             fmt.field("peer_address", &self.peer_address);
             fmt.field("credential_id", &"[HIDDEN]");
+            fmt.field("age", &"[HIDDEN]");
+            fmt.field("evicted", &self.evicted);
+            fmt.field("scheduled_handshake", &self.scheduled_handshake);
             fmt.finish()
         }
     }
@@ -1789,7 +2135,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an UnknownPathSecret packet was rejected as invalid"]
+    /// Emitted when an UnknownPathSecret packet was rejected as invalid
     pub struct UnknownPathSecretPacketRejected<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -1808,7 +2154,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an UnknownPathSecret packet was dropped due to a missing entry"]
+    /// Emitted when an UnknownPathSecret packet was dropped due to a missing entry
     pub struct UnknownPathSecretPacketDropped<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -1827,18 +2173,18 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when a credential is accepted (i.e., post packet authentication and passes replay"]
-    #[doc = " check)."]
+    /// Emitted when a credential is accepted (i.e., post packet authentication and passes replay
+    /// check).
     pub struct KeyAccepted<'a> {
         pub credential_id: &'a [u8],
         pub key_id: u64,
-        #[doc = " How far away this credential is from the leading edge of key IDs (after updating the edge)."]
-        #[doc = ""]
-        #[doc = " Zero if this shifted us forward."]
+        /// How far away this credential is from the leading edge of key IDs (after updating the edge).
+        ///
+        /// Zero if this shifted us forward.
         pub gap: u64,
-        #[doc = " How far away this credential is from the leading edge of key IDs (before updating the edge)."]
-        #[doc = ""]
-        #[doc = " Zero if this didn't change the leading edge."]
+        /// How far away this credential is from the leading edge of key IDs (before updating the edge).
+        ///
+        /// Zero if this didn't change the leading edge.
         pub forward_shift: u64,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -1857,7 +2203,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when credential replay was definitely detected"]
+    /// Emitted when credential replay was definitely detected
     pub struct ReplayDefinitelyDetected<'a> {
         pub credential_id: &'a [u8],
         pub key_id: u64,
@@ -1876,8 +2222,8 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when credential replay was potentially detected, but could not be verified"]
-    #[doc = " due to a limiting tracking window"]
+    /// Emitted when credential replay was potentially detected, but could not be verified
+    /// due to a limiting tracking window
     pub struct ReplayPotentiallyDetected<'a> {
         pub credential_id: &'a [u8],
         pub key_id: u64,
@@ -1898,7 +2244,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an ReplayDetected packet was sent"]
+    /// Emitted when an ReplayDetected packet was sent
     pub struct ReplayDetectedPacketSent<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -1917,7 +2263,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an ReplayDetected packet was received"]
+    /// Emitted when an ReplayDetected packet was received
     pub struct ReplayDetectedPacketReceived<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -1936,7 +2282,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an StaleKey packet was authentic and processed"]
+    /// Emitted when an StaleKey packet was authentic and processed
     pub struct ReplayDetectedPacketAccepted<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -1957,7 +2303,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an ReplayDetected packet was rejected as invalid"]
+    /// Emitted when an ReplayDetected packet was rejected as invalid
     pub struct ReplayDetectedPacketRejected<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -1976,7 +2322,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an ReplayDetected packet was dropped due to a missing entry"]
+    /// Emitted when an ReplayDetected packet was dropped due to a missing entry
     pub struct ReplayDetectedPacketDropped<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -1995,7 +2341,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an StaleKey packet was sent"]
+    /// Emitted when an StaleKey packet was sent
     pub struct StaleKeyPacketSent<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -2014,7 +2360,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an StaleKey packet was received"]
+    /// Emitted when an StaleKey packet was received
     pub struct StaleKeyPacketReceived<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -2033,7 +2379,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an StaleKey packet was authentic and processed"]
+    /// Emitted when an StaleKey packet was authentic and processed
     pub struct StaleKeyPacketAccepted<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -2052,7 +2398,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an StaleKey packet was rejected as invalid"]
+    /// Emitted when an StaleKey packet was rejected as invalid
     pub struct StaleKeyPacketRejected<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -2071,7 +2417,7 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when an StaleKey packet was dropped due to a missing entry"]
+    /// Emitted when an StaleKey packet was dropped due to a missing entry
     pub struct StaleKeyPacketDropped<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -2090,9 +2436,9 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when the cache is accessed by peer address"]
-    #[doc = ""]
-    #[doc = " This can be used to track cache hit ratios"]
+    /// Emitted when the cache is accessed by peer address
+    ///
+    /// This can be used to track cache hit ratios
     pub struct PathSecretMapAddressCacheAccessed<'a> {
         pub peer_address: SocketAddress<'a>,
         pub hit: bool,
@@ -2111,9 +2457,9 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when the cache is accessed by peer address successfully"]
-    #[doc = ""]
-    #[doc = " Provides more information about the accessed entry."]
+    /// Emitted when the cache is accessed by peer address successfully
+    ///
+    /// Provides more information about the accessed entry.
     pub struct PathSecretMapAddressCacheAccessedHit<'a> {
         pub peer_address: SocketAddress<'a>,
         pub age: core::time::Duration,
@@ -2132,9 +2478,9 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when the cache is accessed by path secret ID"]
-    #[doc = ""]
-    #[doc = " This can be used to track cache hit ratios"]
+    /// Emitted when the cache is accessed by path secret ID
+    ///
+    /// This can be used to track cache hit ratios
     pub struct PathSecretMapIdCacheAccessed<'a> {
         pub credential_id: &'a [u8],
         pub hit: bool,
@@ -2153,9 +2499,9 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when the cache is accessed by path secret ID successfully"]
-    #[doc = ""]
-    #[doc = " Provides more information about the accessed entry."]
+    /// Emitted when the cache is accessed by path secret ID successfully
+    ///
+    /// Provides more information about the accessed entry.
     pub struct PathSecretMapIdCacheAccessedHit<'a> {
         pub credential_id: &'a [u8],
         pub age: core::time::Duration,
@@ -2174,41 +2520,49 @@ pub mod api {
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
-    #[doc = " Emitted when the cleaner task performed a single cycle"]
-    #[doc = ""]
-    #[doc = " This can be used to track cache utilization"]
+    /// Emitted when the cleaner task performed a single cycle
+    ///
+    /// This can be used to track cache utilization
     pub struct PathSecretMapCleanerCycled {
-        #[doc = " The number of Path Secret ID entries left after the cleaning cycle"]
+        /// The number of Path Secret ID entries left after the cleaning cycle
         pub id_entries: usize,
-        #[doc = " The number of Path Secret ID entries that were retired in the cycle"]
+        /// The number of Path Secret ID entries that were retired in the cycle
         pub id_entries_retired: usize,
-        #[doc = " Count of entries accessed since the last cycle"]
+        /// Count of entries accessed since the last cycle
         pub id_entries_active: usize,
-        #[doc = " The utilization percentage of the active number of entries after the cycle"]
+        /// The utilization percentage of the active number of entries after the cycle
         pub id_entries_active_utilization: f32,
-        #[doc = " The utilization percentage of the available number of entries after the cycle"]
+        /// The utilization percentage of the available number of entries after the cycle
         pub id_entries_utilization: f32,
-        #[doc = " The utilization percentage of the available number of entries before the cycle"]
+        /// The utilization percentage of the available number of entries before the cycle
         pub id_entries_initial_utilization: f32,
-        #[doc = " The number of SocketAddress entries left after the cleaning cycle"]
+        /// The number of SocketAddress entries left after the cleaning cycle
         pub address_entries: usize,
-        #[doc = " Count of entries accessed since the last cycle"]
+        /// Count of entries accessed since the last cycle
         pub address_entries_active: usize,
-        #[doc = " The utilization percentage of the active number of entries after the cycle"]
+        /// The utilization percentage of the active number of entries after the cycle
         pub address_entries_active_utilization: f32,
-        #[doc = " The number of SocketAddress entries that were retired in the cycle"]
+        /// The number of SocketAddress entries that were retired in the cycle
         pub address_entries_retired: usize,
-        #[doc = " The utilization percentage of the available number of address entries after the cycle"]
+        /// The utilization percentage of the available number of address entries after the cycle
         pub address_entries_utilization: f32,
-        #[doc = " The utilization percentage of the available number of address entries before the cycle"]
+        /// The utilization percentage of the available number of address entries before the cycle
         pub address_entries_initial_utilization: f32,
-        #[doc = " The number of handshake requests that are pending after the cleaning cycle"]
+        /// The number of Path Secret ID entries created within the last rehandshake period (usually 24
+        /// hours)
+        pub id_entries_in_last_hs_period: usize,
+        /// The utilization percentage of Path Secret ID entries created within the last rehandshake
+        /// period (usually 24 hours)
+        pub id_entries_in_last_hs_period_utilization: f32,
+        /// The number of handshake requests that are pending after the cleaning cycle
         pub handshake_requests: usize,
-        #[doc = " The number of handshake requests that were retired in the cycle"]
-        pub handshake_requests_retired: usize,
-        #[doc = " How long we kept the handshake lock held (this blocks completing handshakes)."]
+        /// The number of handshake requests that were skipped in the cycle due to running out of time
+        /// (other background handshakes took too long to complete, and so were postponed to the next
+        /// cleaner cycle).
+        pub handshake_requests_skipped: usize,
+        /// How long we kept the handshake lock held (this blocks completing handshakes).
         pub handshake_lock_duration: core::time::Duration,
-        #[doc = " Total duration of a cycle."]
+        /// Total duration of a cycle.
         pub duration: core::time::Duration,
     }
     #[cfg(any(test, feature = "testing"))]
@@ -2242,10 +2596,18 @@ pub mod api {
                 "address_entries_initial_utilization",
                 &self.address_entries_initial_utilization,
             );
+            fmt.field(
+                "id_entries_in_last_hs_period",
+                &self.id_entries_in_last_hs_period,
+            );
+            fmt.field(
+                "id_entries_in_last_hs_period_utilization",
+                &self.id_entries_in_last_hs_period_utilization,
+            );
             fmt.field("handshake_requests", &self.handshake_requests);
             fmt.field(
-                "handshake_requests_retired",
-                &self.handshake_requests_retired,
+                "handshake_requests_skipped",
+                &self.handshake_requests_skipped,
             );
             fmt.field("handshake_lock_duration", &self.handshake_lock_duration);
             fmt.field("duration", &self.duration);
@@ -2254,6 +2616,33 @@ pub mod api {
     }
     impl Event for PathSecretMapCleanerCycled {
         const NAME: &'static str = "path_secret_map:cleaner_cycled";
+    }
+    #[derive(Clone, Debug)]
+    #[non_exhaustive]
+    /// Emitted when the path secret map is serialized to disk
+    pub struct PathSecretMapSerialized {
+        /// The number of entries written to the serialized file
+        pub entries: usize,
+        /// The size of the serialized file, in bytes
+        pub file_size: usize,
+        /// How long serialization took
+        pub duration: core::time::Duration,
+        /// Whether serialization failed
+        pub error: bool,
+    }
+    #[cfg(any(test, feature = "testing"))]
+    impl crate::event::snapshot::Fmt for PathSecretMapSerialized {
+        fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+            let mut fmt = fmt.debug_struct("PathSecretMapSerialized");
+            fmt.field("entries", &self.entries);
+            fmt.field("file_size", &self.file_size);
+            fmt.field("duration", &self.duration);
+            fmt.field("error", &self.error);
+            fmt.finish()
+        }
+    }
+    impl Event for PathSecretMapSerialized {
+        const NAME: &'static str = "path_secret_map:serialized";
     }
     #[derive(Clone, Debug)]
     #[non_exhaustive]
@@ -2291,6 +2680,82 @@ pub mod api {
     impl Event for PathSecretMapAddressWriteLock {
         const NAME: &'static str = "path_secret_map:address_cache_write_lock";
     }
+    #[derive(Clone, Debug)]
+    #[non_exhaustive]
+    /// Emitted when a dcQUIC datagram is encrypted
+    pub struct PathSecretMapDatagramEncrypt {
+        /// The wire size of the encrypted datagram packet
+        pub packet_len: usize,
+    }
+    #[cfg(any(test, feature = "testing"))]
+    impl crate::event::snapshot::Fmt for PathSecretMapDatagramEncrypt {
+        fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+            let mut fmt = fmt.debug_struct("PathSecretMapDatagramEncrypt");
+            fmt.field("packet_len", &self.packet_len);
+            fmt.finish()
+        }
+    }
+    impl Event for PathSecretMapDatagramEncrypt {
+        const NAME: &'static str = "path_secret_map:datagram_encrypt";
+    }
+    #[derive(Clone, Debug)]
+    #[non_exhaustive]
+    /// Emitted when a dcQUIC datagram is decrypted
+    pub struct PathSecretMapDatagramDecrypt {
+        /// The wire size of the encrypted datagram packet
+        pub packet_len: usize,
+    }
+    #[cfg(any(test, feature = "testing"))]
+    impl crate::event::snapshot::Fmt for PathSecretMapDatagramDecrypt {
+        fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+            let mut fmt = fmt.debug_struct("PathSecretMapDatagramDecrypt");
+            fmt.field("packet_len", &self.packet_len);
+            fmt.finish()
+        }
+    }
+    impl Event for PathSecretMapDatagramDecrypt {
+        const NAME: &'static str = "path_secret_map:datagram_decrypt";
+    }
+    #[non_exhaustive]
+    #[derive(Debug, Copy, Clone)]
+    pub enum EvictionReason {
+        #[non_exhaustive]
+        /// Capacity of map exceeded.
+        Capacity {},
+        #[non_exhaustive]
+        /// UnknownPathSecret received, removing entry.
+        UnknownPathSecret {},
+        #[non_exhaustive]
+        /// A newer entry is replacing this one, so we're retiring these.
+        Retiring {},
+    }
+    impl aggregate::AsVariant for EvictionReason {
+        const VARIANTS: &'static [aggregate::info::Variant] = &[
+            aggregate::info::variant::Builder {
+                name: aggregate::info::Str::new("CAPACITY\0"),
+                id: 0usize,
+            }
+            .build(),
+            aggregate::info::variant::Builder {
+                name: aggregate::info::Str::new("UNKNOWN_PATH_SECRET\0"),
+                id: 1usize,
+            }
+            .build(),
+            aggregate::info::variant::Builder {
+                name: aggregate::info::Str::new("RETIRING\0"),
+                id: 2usize,
+            }
+            .build(),
+        ];
+        #[inline]
+        fn variant_idx(&self) -> usize {
+            match self {
+                Self::Capacity { .. } => 0usize,
+                Self::UnknownPathSecret { .. } => 1usize,
+                Self::Retiring { .. } => 2usize,
+            }
+        }
+    }
     impl IntoEvent<builder::AcceptorPacketDropReason> for s2n_codec::DecoderError {
         fn into_event(self) -> builder::AcceptorPacketDropReason {
             use builder::AcceptorPacketDropReason as Reason;
@@ -2305,16 +2770,18 @@ pub mod api {
     }
 }
 pub mod tracing {
-    #![doc = r" This module contains event integration with [`tracing`](https://docs.rs/tracing)"]
+    //! This module contains event integration with [`tracing`](https://docs.rs/tracing)
     use super::api;
-    #[doc = r" Emits events with [`tracing`](https://docs.rs/tracing)"]
+    /// Emits events with [`tracing`](https://docs.rs/tracing)
     #[derive(Clone, Debug)]
     pub struct Subscriber {
         root: tracing::Span,
     }
     impl Default for Subscriber {
         fn default() -> Self {
-            let root = tracing :: span ! (target : "s2n_quic_dc" , tracing :: Level :: DEBUG , "s2n_quic_dc");
+            let root = tracing::span!(
+                target : "s2n_quic_dc", tracing::Level::DEBUG, "s2n_quic_dc"
+            );
             Self { root }
         }
     }
@@ -2331,7 +2798,10 @@ pub mod tracing {
             _info: &api::ConnectionInfo,
         ) -> Self::ConnectionContext {
             let parent = self.parent(meta);
-            tracing :: span ! (target : "s2n_quic_dc" , parent : parent , tracing :: Level :: DEBUG , "conn" , id = meta . id)
+            tracing::span!(
+                target : "s2n_quic_dc", parent : parent, tracing::Level::DEBUG, "conn",
+                id = meta.id
+            )
         }
         #[inline]
         fn on_acceptor_tcp_started(
@@ -2345,7 +2815,12 @@ pub mod tracing {
                 local_address,
                 backlog,
             } = event;
-            tracing :: event ! (target : "acceptor_tcp_started" , parent : parent , tracing :: Level :: DEBUG , { id = tracing :: field :: debug (id) , local_address = tracing :: field :: debug (local_address) , backlog = tracing :: field :: debug (backlog) });
+            tracing::event!(
+                target : "acceptor_tcp_started", parent : parent, tracing::Level::DEBUG,
+                { id = tracing::field::debug(id), local_address =
+                tracing::field::debug(local_address), backlog =
+                tracing::field::debug(backlog) }
+            );
         }
         #[inline]
         fn on_acceptor_tcp_loop_iteration_completed(
@@ -2361,7 +2836,15 @@ pub mod tracing {
                 processing_duration,
                 max_sojourn_time,
             } = event;
-            tracing :: event ! (target : "acceptor_tcp_loop_iteration_completed" , parent : parent , tracing :: Level :: DEBUG , { pending_streams = tracing :: field :: debug (pending_streams) , slots_idle = tracing :: field :: debug (slots_idle) , slot_utilization = tracing :: field :: debug (slot_utilization) , processing_duration = tracing :: field :: debug (processing_duration) , max_sojourn_time = tracing :: field :: debug (max_sojourn_time) });
+            tracing::event!(
+                target : "acceptor_tcp_loop_iteration_completed", parent : parent,
+                tracing::Level::DEBUG, { pending_streams =
+                tracing::field::debug(pending_streams), slots_idle =
+                tracing::field::debug(slots_idle), slot_utilization =
+                tracing::field::debug(slot_utilization), processing_duration =
+                tracing::field::debug(processing_duration), max_sojourn_time =
+                tracing::field::debug(max_sojourn_time) }
+            );
         }
         #[inline]
         fn on_acceptor_tcp_fresh_enqueued(
@@ -2371,7 +2854,11 @@ pub mod tracing {
         ) {
             let parent = self.parent(meta);
             let api::AcceptorTcpFreshEnqueued { remote_address } = event;
-            tracing :: event ! (target : "acceptor_tcp_fresh_enqueued" , parent : parent , tracing :: Level :: DEBUG , { remote_address = tracing :: field :: debug (remote_address) });
+            tracing::event!(
+                target : "acceptor_tcp_fresh_enqueued", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address) }
+            );
         }
         #[inline]
         fn on_acceptor_tcp_fresh_batch_completed(
@@ -2385,7 +2872,12 @@ pub mod tracing {
                 dropped,
                 errored,
             } = event;
-            tracing :: event ! (target : "acceptor_tcp_fresh_batch_completed" , parent : parent , tracing :: Level :: DEBUG , { enqueued = tracing :: field :: debug (enqueued) , dropped = tracing :: field :: debug (dropped) , errored = tracing :: field :: debug (errored) });
+            tracing::event!(
+                target : "acceptor_tcp_fresh_batch_completed", parent : parent,
+                tracing::Level::DEBUG, { enqueued = tracing::field::debug(enqueued),
+                dropped = tracing::field::debug(dropped), errored =
+                tracing::field::debug(errored) }
+            );
         }
         #[inline]
         fn on_acceptor_tcp_stream_dropped(
@@ -2398,7 +2890,12 @@ pub mod tracing {
                 remote_address,
                 reason,
             } = event;
-            tracing :: event ! (target : "acceptor_tcp_stream_dropped" , parent : parent , tracing :: Level :: DEBUG , { remote_address = tracing :: field :: debug (remote_address) , reason = tracing :: field :: debug (reason) });
+            tracing::event!(
+                target : "acceptor_tcp_stream_dropped", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), reason =
+                tracing::field::debug(reason) }
+            );
         }
         #[inline]
         fn on_acceptor_tcp_stream_replaced(
@@ -2412,7 +2909,13 @@ pub mod tracing {
                 sojourn_time,
                 buffer_len,
             } = event;
-            tracing :: event ! (target : "acceptor_tcp_stream_replaced" , parent : parent , tracing :: Level :: DEBUG , { remote_address = tracing :: field :: debug (remote_address) , sojourn_time = tracing :: field :: debug (sojourn_time) , buffer_len = tracing :: field :: debug (buffer_len) });
+            tracing::event!(
+                target : "acceptor_tcp_stream_replaced", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), sojourn_time =
+                tracing::field::debug(sojourn_time), buffer_len =
+                tracing::field::debug(buffer_len) }
+            );
         }
         #[inline]
         fn on_acceptor_tcp_packet_received(
@@ -2430,7 +2933,97 @@ pub mod tracing {
                 is_fin_known,
                 sojourn_time,
             } = event;
-            tracing :: event ! (target : "acceptor_tcp_packet_received" , parent : parent , tracing :: Level :: DEBUG , { remote_address = tracing :: field :: debug (remote_address) , credential_id = tracing :: field :: debug (credential_id) , stream_id = tracing :: field :: debug (stream_id) , payload_len = tracing :: field :: debug (payload_len) , is_fin = tracing :: field :: debug (is_fin) , is_fin_known = tracing :: field :: debug (is_fin_known) , sojourn_time = tracing :: field :: debug (sojourn_time) });
+            tracing::event!(
+                target : "acceptor_tcp_packet_received", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), credential_id =
+                tracing::field::debug(credential_id), stream_id =
+                tracing::field::debug(stream_id), payload_len =
+                tracing::field::debug(payload_len), is_fin =
+                tracing::field::debug(is_fin), is_fin_known =
+                tracing::field::debug(is_fin_known), sojourn_time =
+                tracing::field::debug(sojourn_time) }
+            );
+        }
+        #[inline]
+        fn on_acceptor_tcp_tls_started(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpTlsStarted,
+        ) {
+            let parent = self.parent(meta);
+            let api::AcceptorTcpTlsStarted {
+                remote_address,
+                sojourn_time,
+            } = event;
+            tracing::event!(
+                target : "acceptor_tcp_tls_started", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), sojourn_time =
+                tracing::field::debug(sojourn_time) }
+            );
+        }
+        #[inline]
+        fn on_acceptor_tcp_tls_stream_enqueued(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpTlsStreamEnqueued,
+        ) {
+            let parent = self.parent(meta);
+            let api::AcceptorTcpTlsStreamEnqueued {
+                remote_address,
+                sojourn_time,
+            } = event;
+            tracing::event!(
+                target : "acceptor_tcp_tls_stream_enqueued", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), sojourn_time =
+                tracing::field::debug(sojourn_time) }
+            );
+        }
+        #[inline]
+        fn on_acceptor_tcp_tls_stream_rejected(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpTlsStreamRejected,
+        ) {
+            let parent = self.parent(meta);
+            let api::AcceptorTcpTlsStreamRejected {
+                remote_address,
+                local_address,
+                sojourn_time,
+                error,
+            } = event;
+            tracing::event!(
+                target : "acceptor_tcp_tls_stream_rejected", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), local_address =
+                tracing::field::debug(local_address), sojourn_time =
+                tracing::field::debug(sojourn_time), error = tracing::field::debug(error)
+                }
+            );
+        }
+        #[inline]
+        fn on_acceptor_tcp_synthetic_tls_stream_rejected(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpSyntheticTlsStreamRejected,
+        ) {
+            let parent = self.parent(meta);
+            let api::AcceptorTcpSyntheticTlsStreamRejected {
+                remote_address,
+                local_address,
+                sojourn_time,
+                error,
+            } = event;
+            tracing::event!(
+                target : "acceptor_tcp_synthetic_tls_stream_rejected", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), local_address =
+                tracing::field::debug(local_address), sojourn_time =
+                tracing::field::debug(sojourn_time), error = tracing::field::debug(error)
+                }
+            );
         }
         #[inline]
         fn on_acceptor_tcp_packet_dropped(
@@ -2444,7 +3037,13 @@ pub mod tracing {
                 reason,
                 sojourn_time,
             } = event;
-            tracing :: event ! (target : "acceptor_tcp_packet_dropped" , parent : parent , tracing :: Level :: DEBUG , { remote_address = tracing :: field :: debug (remote_address) , reason = tracing :: field :: debug (reason) , sojourn_time = tracing :: field :: debug (sojourn_time) });
+            tracing::event!(
+                target : "acceptor_tcp_packet_dropped", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), reason =
+                tracing::field::debug(reason), sojourn_time =
+                tracing::field::debug(sojourn_time) }
+            );
         }
         #[inline]
         fn on_acceptor_tcp_stream_enqueued(
@@ -2460,7 +3059,15 @@ pub mod tracing {
                 sojourn_time,
                 blocked_count,
             } = event;
-            tracing :: event ! (target : "acceptor_tcp_stream_enqueued" , parent : parent , tracing :: Level :: DEBUG , { remote_address = tracing :: field :: debug (remote_address) , credential_id = tracing :: field :: debug (credential_id) , stream_id = tracing :: field :: debug (stream_id) , sojourn_time = tracing :: field :: debug (sojourn_time) , blocked_count = tracing :: field :: debug (blocked_count) });
+            tracing::event!(
+                target : "acceptor_tcp_stream_enqueued", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), credential_id =
+                tracing::field::debug(credential_id), stream_id =
+                tracing::field::debug(stream_id), sojourn_time =
+                tracing::field::debug(sojourn_time), blocked_count =
+                tracing::field::debug(blocked_count) }
+            );
         }
         #[inline]
         fn on_acceptor_tcp_io_error(
@@ -2469,8 +3076,12 @@ pub mod tracing {
             event: &api::AcceptorTcpIoError,
         ) {
             let parent = self.parent(meta);
-            let api::AcceptorTcpIoError { error } = event;
-            tracing :: event ! (target : "acceptor_tcp_io_error" , parent : parent , tracing :: Level :: DEBUG , { error = tracing :: field :: debug (error) });
+            let api::AcceptorTcpIoError { error, source } = event;
+            tracing::event!(
+                target : "acceptor_tcp_io_error", parent : parent, tracing::Level::DEBUG,
+                { error = tracing::field::debug(error), source =
+                tracing::field::debug(source) }
+            );
         }
         #[inline]
         fn on_acceptor_tcp_socket_sent(
@@ -2486,7 +3097,15 @@ pub mod tracing {
                 blocked_count,
                 payload_len,
             } = event;
-            tracing :: event ! (target : "acceptor_tcp_socket_sent" , parent : parent , tracing :: Level :: DEBUG , { credential_id = tracing :: field :: debug (credential_id) , stream_id = tracing :: field :: debug (stream_id) , sojourn_time = tracing :: field :: debug (sojourn_time) , blocked_count = tracing :: field :: debug (blocked_count) , payload_len = tracing :: field :: debug (payload_len) });
+            tracing::event!(
+                target : "acceptor_tcp_socket_sent", parent : parent,
+                tracing::Level::DEBUG, { credential_id =
+                tracing::field::debug(credential_id), stream_id =
+                tracing::field::debug(stream_id), sojourn_time =
+                tracing::field::debug(sojourn_time), blocked_count =
+                tracing::field::debug(blocked_count), payload_len =
+                tracing::field::debug(payload_len) }
+            );
         }
         #[inline]
         fn on_acceptor_tcp_socket_received(
@@ -2502,7 +3121,15 @@ pub mod tracing {
                 transfer_time,
                 payload_len,
             } = event;
-            tracing :: event ! (target : "acceptor_tcp_socket_received" , parent : parent , tracing :: Level :: DEBUG , { remote_address = tracing :: field :: debug (remote_address) , credential_id = tracing :: field :: debug (credential_id) , stream_id = tracing :: field :: debug (stream_id) , transfer_time = tracing :: field :: debug (transfer_time) , payload_len = tracing :: field :: debug (payload_len) });
+            tracing::event!(
+                target : "acceptor_tcp_socket_received", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), credential_id =
+                tracing::field::debug(credential_id), stream_id =
+                tracing::field::debug(stream_id), transfer_time =
+                tracing::field::debug(transfer_time), payload_len =
+                tracing::field::debug(payload_len) }
+            );
         }
         #[inline]
         fn on_acceptor_udp_started(
@@ -2512,7 +3139,11 @@ pub mod tracing {
         ) {
             let parent = self.parent(meta);
             let api::AcceptorUdpStarted { id, local_address } = event;
-            tracing :: event ! (target : "acceptor_udp_started" , parent : parent , tracing :: Level :: DEBUG , { id = tracing :: field :: debug (id) , local_address = tracing :: field :: debug (local_address) });
+            tracing::event!(
+                target : "acceptor_udp_started", parent : parent, tracing::Level::DEBUG,
+                { id = tracing::field::debug(id), local_address =
+                tracing::field::debug(local_address) }
+            );
         }
         #[inline]
         fn on_acceptor_udp_datagram_received(
@@ -2525,7 +3156,11 @@ pub mod tracing {
                 remote_address,
                 len,
             } = event;
-            tracing :: event ! (target : "acceptor_udp_datagram_received" , parent : parent , tracing :: Level :: DEBUG , { remote_address = tracing :: field :: debug (remote_address) , len = tracing :: field :: debug (len) });
+            tracing::event!(
+                target : "acceptor_udp_datagram_received", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), len = tracing::field::debug(len) }
+            );
         }
         #[inline]
         fn on_acceptor_udp_packet_received(
@@ -2544,7 +3179,18 @@ pub mod tracing {
                 is_fin,
                 is_fin_known,
             } = event;
-            tracing :: event ! (target : "acceptor_udp_packet_received" , parent : parent , tracing :: Level :: DEBUG , { remote_address = tracing :: field :: debug (remote_address) , credential_id = tracing :: field :: debug (credential_id) , stream_id = tracing :: field :: debug (stream_id) , payload_len = tracing :: field :: debug (payload_len) , is_zero_offset = tracing :: field :: debug (is_zero_offset) , is_retransmission = tracing :: field :: debug (is_retransmission) , is_fin = tracing :: field :: debug (is_fin) , is_fin_known = tracing :: field :: debug (is_fin_known) });
+            tracing::event!(
+                target : "acceptor_udp_packet_received", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), credential_id =
+                tracing::field::debug(credential_id), stream_id =
+                tracing::field::debug(stream_id), payload_len =
+                tracing::field::debug(payload_len), is_zero_offset =
+                tracing::field::debug(is_zero_offset), is_retransmission =
+                tracing::field::debug(is_retransmission), is_fin =
+                tracing::field::debug(is_fin), is_fin_known =
+                tracing::field::debug(is_fin_known) }
+            );
         }
         #[inline]
         fn on_acceptor_udp_packet_dropped(
@@ -2557,7 +3203,12 @@ pub mod tracing {
                 remote_address,
                 reason,
             } = event;
-            tracing :: event ! (target : "acceptor_udp_packet_dropped" , parent : parent , tracing :: Level :: DEBUG , { remote_address = tracing :: field :: debug (remote_address) , reason = tracing :: field :: debug (reason) });
+            tracing::event!(
+                target : "acceptor_udp_packet_dropped", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), reason =
+                tracing::field::debug(reason) }
+            );
         }
         #[inline]
         fn on_acceptor_udp_stream_enqueued(
@@ -2571,7 +3222,13 @@ pub mod tracing {
                 credential_id,
                 stream_id,
             } = event;
-            tracing :: event ! (target : "acceptor_udp_stream_enqueued" , parent : parent , tracing :: Level :: DEBUG , { remote_address = tracing :: field :: debug (remote_address) , credential_id = tracing :: field :: debug (credential_id) , stream_id = tracing :: field :: debug (stream_id) });
+            tracing::event!(
+                target : "acceptor_udp_stream_enqueued", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), credential_id =
+                tracing::field::debug(credential_id), stream_id =
+                tracing::field::debug(stream_id) }
+            );
         }
         #[inline]
         fn on_acceptor_udp_io_error(
@@ -2581,7 +3238,10 @@ pub mod tracing {
         ) {
             let parent = self.parent(meta);
             let api::AcceptorUdpIoError { error } = event;
-            tracing :: event ! (target : "acceptor_udp_io_error" , parent : parent , tracing :: Level :: DEBUG , { error = tracing :: field :: debug (error) });
+            tracing::event!(
+                target : "acceptor_udp_io_error", parent : parent, tracing::Level::DEBUG,
+                { error = tracing::field::debug(error) }
+            );
         }
         #[inline]
         fn on_acceptor_stream_pruned(
@@ -2597,7 +3257,15 @@ pub mod tracing {
                 sojourn_time,
                 reason,
             } = event;
-            tracing :: event ! (target : "acceptor_stream_pruned" , parent : parent , tracing :: Level :: DEBUG , { remote_address = tracing :: field :: debug (remote_address) , credential_id = tracing :: field :: debug (credential_id) , stream_id = tracing :: field :: debug (stream_id) , sojourn_time = tracing :: field :: debug (sojourn_time) , reason = tracing :: field :: debug (reason) });
+            tracing::event!(
+                target : "acceptor_stream_pruned", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), credential_id =
+                tracing::field::debug(credential_id), stream_id =
+                tracing::field::debug(stream_id), sojourn_time =
+                tracing::field::debug(sojourn_time), reason =
+                tracing::field::debug(reason) }
+            );
         }
         #[inline]
         fn on_acceptor_stream_dequeued(
@@ -2611,8 +3279,17 @@ pub mod tracing {
                 credential_id,
                 stream_id,
                 sojourn_time,
+                queue_sojourn_time,
             } = event;
-            tracing :: event ! (target : "acceptor_stream_dequeued" , parent : parent , tracing :: Level :: DEBUG , { remote_address = tracing :: field :: debug (remote_address) , credential_id = tracing :: field :: debug (credential_id) , stream_id = tracing :: field :: debug (stream_id) , sojourn_time = tracing :: field :: debug (sojourn_time) });
+            tracing::event!(
+                target : "acceptor_stream_dequeued", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), credential_id =
+                tracing::field::debug(credential_id), stream_id =
+                tracing::field::debug(stream_id), sojourn_time =
+                tracing::field::debug(sojourn_time), queue_sojourn_time =
+                tracing::field::debug(queue_sojourn_time) }
+            );
         }
         #[inline]
         fn on_stream_write_flushed(
@@ -2627,7 +3304,12 @@ pub mod tracing {
                 committed_len,
                 processing_duration,
             } = event;
-            tracing :: event ! (target : "stream_write_flushed" , parent : id , tracing :: Level :: DEBUG , { provided_len = tracing :: field :: debug (provided_len) , committed_len = tracing :: field :: debug (committed_len) , processing_duration = tracing :: field :: debug (processing_duration) });
+            tracing::event!(
+                target : "stream_write_flushed", parent : id, tracing::Level::DEBUG, {
+                provided_len = tracing::field::debug(provided_len), committed_len =
+                tracing::field::debug(committed_len), processing_duration =
+                tracing::field::debug(processing_duration) }
+            );
         }
         #[inline]
         fn on_stream_write_fin_flushed(
@@ -2642,7 +3324,12 @@ pub mod tracing {
                 committed_len,
                 processing_duration,
             } = event;
-            tracing :: event ! (target : "stream_write_fin_flushed" , parent : id , tracing :: Level :: DEBUG , { provided_len = tracing :: field :: debug (provided_len) , committed_len = tracing :: field :: debug (committed_len) , processing_duration = tracing :: field :: debug (processing_duration) });
+            tracing::event!(
+                target : "stream_write_fin_flushed", parent : id, tracing::Level::DEBUG,
+                { provided_len = tracing::field::debug(provided_len), committed_len =
+                tracing::field::debug(committed_len), processing_duration =
+                tracing::field::debug(processing_duration) }
+            );
         }
         #[inline]
         fn on_stream_write_blocked(
@@ -2657,7 +3344,12 @@ pub mod tracing {
                 is_fin,
                 processing_duration,
             } = event;
-            tracing :: event ! (target : "stream_write_blocked" , parent : id , tracing :: Level :: DEBUG , { provided_len = tracing :: field :: debug (provided_len) , is_fin = tracing :: field :: debug (is_fin) , processing_duration = tracing :: field :: debug (processing_duration) });
+            tracing::event!(
+                target : "stream_write_blocked", parent : id, tracing::Level::DEBUG, {
+                provided_len = tracing::field::debug(provided_len), is_fin =
+                tracing::field::debug(is_fin), processing_duration =
+                tracing::field::debug(processing_duration) }
+            );
         }
         #[inline]
         fn on_stream_write_errored(
@@ -2673,7 +3365,13 @@ pub mod tracing {
                 processing_duration,
                 errno,
             } = event;
-            tracing :: event ! (target : "stream_write_errored" , parent : id , tracing :: Level :: DEBUG , { provided_len = tracing :: field :: debug (provided_len) , is_fin = tracing :: field :: debug (is_fin) , processing_duration = tracing :: field :: debug (processing_duration) , errno = tracing :: field :: debug (errno) });
+            tracing::event!(
+                target : "stream_write_errored", parent : id, tracing::Level::DEBUG, {
+                provided_len = tracing::field::debug(provided_len), is_fin =
+                tracing::field::debug(is_fin), processing_duration =
+                tracing::field::debug(processing_duration), errno =
+                tracing::field::debug(errno) }
+            );
         }
         #[inline]
         fn on_stream_write_key_updated(
@@ -2684,7 +3382,10 @@ pub mod tracing {
         ) {
             let id = context.id();
             let api::StreamWriteKeyUpdated { key_phase } = event;
-            tracing :: event ! (target : "stream_write_key_updated" , parent : id , tracing :: Level :: DEBUG , { key_phase = tracing :: field :: debug (key_phase) });
+            tracing::event!(
+                target : "stream_write_key_updated", parent : id, tracing::Level::DEBUG,
+                { key_phase = tracing::field::debug(key_phase) }
+            );
         }
         #[inline]
         fn on_stream_write_allocated(
@@ -2695,7 +3396,10 @@ pub mod tracing {
         ) {
             let id = context.id();
             let api::StreamWriteAllocated { allocated_len } = event;
-            tracing :: event ! (target : "stream_write_allocated" , parent : id , tracing :: Level :: DEBUG , { allocated_len = tracing :: field :: debug (allocated_len) });
+            tracing::event!(
+                target : "stream_write_allocated", parent : id, tracing::Level::DEBUG, {
+                allocated_len = tracing::field::debug(allocated_len) }
+            );
         }
         #[inline]
         fn on_stream_write_shutdown(
@@ -2709,7 +3413,11 @@ pub mod tracing {
                 buffer_len,
                 background,
             } = event;
-            tracing :: event ! (target : "stream_write_shutdown" , parent : id , tracing :: Level :: DEBUG , { buffer_len = tracing :: field :: debug (buffer_len) , background = tracing :: field :: debug (background) });
+            tracing::event!(
+                target : "stream_write_shutdown", parent : id, tracing::Level::DEBUG, {
+                buffer_len = tracing::field::debug(buffer_len), background =
+                tracing::field::debug(background) }
+            );
         }
         #[inline]
         fn on_stream_write_socket_flushed(
@@ -2723,7 +3431,12 @@ pub mod tracing {
                 provided_len,
                 committed_len,
             } = event;
-            tracing :: event ! (target : "stream_write_socket_flushed" , parent : id , tracing :: Level :: DEBUG , { provided_len = tracing :: field :: debug (provided_len) , committed_len = tracing :: field :: debug (committed_len) });
+            tracing::event!(
+                target : "stream_write_socket_flushed", parent : id,
+                tracing::Level::DEBUG, { provided_len =
+                tracing::field::debug(provided_len), committed_len =
+                tracing::field::debug(committed_len) }
+            );
         }
         #[inline]
         fn on_stream_write_socket_blocked(
@@ -2734,7 +3447,11 @@ pub mod tracing {
         ) {
             let id = context.id();
             let api::StreamWriteSocketBlocked { provided_len } = event;
-            tracing :: event ! (target : "stream_write_socket_blocked" , parent : id , tracing :: Level :: DEBUG , { provided_len = tracing :: field :: debug (provided_len) });
+            tracing::event!(
+                target : "stream_write_socket_blocked", parent : id,
+                tracing::Level::DEBUG, { provided_len =
+                tracing::field::debug(provided_len) }
+            );
         }
         #[inline]
         fn on_stream_write_socket_errored(
@@ -2748,7 +3465,12 @@ pub mod tracing {
                 provided_len,
                 errno,
             } = event;
-            tracing :: event ! (target : "stream_write_socket_errored" , parent : id , tracing :: Level :: DEBUG , { provided_len = tracing :: field :: debug (provided_len) , errno = tracing :: field :: debug (errno) });
+            tracing::event!(
+                target : "stream_write_socket_errored", parent : id,
+                tracing::Level::DEBUG, { provided_len =
+                tracing::field::debug(provided_len), errno = tracing::field::debug(errno)
+                }
+            );
         }
         #[inline]
         fn on_stream_read_flushed(
@@ -2763,7 +3485,12 @@ pub mod tracing {
                 committed_len,
                 processing_duration,
             } = event;
-            tracing :: event ! (target : "stream_read_flushed" , parent : id , tracing :: Level :: DEBUG , { capacity = tracing :: field :: debug (capacity) , committed_len = tracing :: field :: debug (committed_len) , processing_duration = tracing :: field :: debug (processing_duration) });
+            tracing::event!(
+                target : "stream_read_flushed", parent : id, tracing::Level::DEBUG, {
+                capacity = tracing::field::debug(capacity), committed_len =
+                tracing::field::debug(committed_len), processing_duration =
+                tracing::field::debug(processing_duration) }
+            );
         }
         #[inline]
         fn on_stream_read_fin_flushed(
@@ -2777,7 +3504,11 @@ pub mod tracing {
                 capacity,
                 processing_duration,
             } = event;
-            tracing :: event ! (target : "stream_read_fin_flushed" , parent : id , tracing :: Level :: DEBUG , { capacity = tracing :: field :: debug (capacity) , processing_duration = tracing :: field :: debug (processing_duration) });
+            tracing::event!(
+                target : "stream_read_fin_flushed", parent : id, tracing::Level::DEBUG, {
+                capacity = tracing::field::debug(capacity), processing_duration =
+                tracing::field::debug(processing_duration) }
+            );
         }
         #[inline]
         fn on_stream_read_blocked(
@@ -2791,7 +3522,11 @@ pub mod tracing {
                 capacity,
                 processing_duration,
             } = event;
-            tracing :: event ! (target : "stream_read_blocked" , parent : id , tracing :: Level :: DEBUG , { capacity = tracing :: field :: debug (capacity) , processing_duration = tracing :: field :: debug (processing_duration) });
+            tracing::event!(
+                target : "stream_read_blocked", parent : id, tracing::Level::DEBUG, {
+                capacity = tracing::field::debug(capacity), processing_duration =
+                tracing::field::debug(processing_duration) }
+            );
         }
         #[inline]
         fn on_stream_read_errored(
@@ -2806,7 +3541,12 @@ pub mod tracing {
                 processing_duration,
                 errno,
             } = event;
-            tracing :: event ! (target : "stream_read_errored" , parent : id , tracing :: Level :: DEBUG , { capacity = tracing :: field :: debug (capacity) , processing_duration = tracing :: field :: debug (processing_duration) , errno = tracing :: field :: debug (errno) });
+            tracing::event!(
+                target : "stream_read_errored", parent : id, tracing::Level::DEBUG, {
+                capacity = tracing::field::debug(capacity), processing_duration =
+                tracing::field::debug(processing_duration), errno =
+                tracing::field::debug(errno) }
+            );
         }
         #[inline]
         fn on_stream_read_key_updated(
@@ -2817,7 +3557,10 @@ pub mod tracing {
         ) {
             let id = context.id();
             let api::StreamReadKeyUpdated { key_phase } = event;
-            tracing :: event ! (target : "stream_read_key_updated" , parent : id , tracing :: Level :: DEBUG , { key_phase = tracing :: field :: debug (key_phase) });
+            tracing::event!(
+                target : "stream_read_key_updated", parent : id, tracing::Level::DEBUG, {
+                key_phase = tracing::field::debug(key_phase) }
+            );
         }
         #[inline]
         fn on_stream_read_shutdown(
@@ -2828,7 +3571,10 @@ pub mod tracing {
         ) {
             let id = context.id();
             let api::StreamReadShutdown { background } = event;
-            tracing :: event ! (target : "stream_read_shutdown" , parent : id , tracing :: Level :: DEBUG , { background = tracing :: field :: debug (background) });
+            tracing::event!(
+                target : "stream_read_shutdown", parent : id, tracing::Level::DEBUG, {
+                background = tracing::field::debug(background) }
+            );
         }
         #[inline]
         fn on_stream_read_socket_flushed(
@@ -2842,7 +3588,11 @@ pub mod tracing {
                 capacity,
                 committed_len,
             } = event;
-            tracing :: event ! (target : "stream_read_socket_flushed" , parent : id , tracing :: Level :: DEBUG , { capacity = tracing :: field :: debug (capacity) , committed_len = tracing :: field :: debug (committed_len) });
+            tracing::event!(
+                target : "stream_read_socket_flushed", parent : id,
+                tracing::Level::DEBUG, { capacity = tracing::field::debug(capacity),
+                committed_len = tracing::field::debug(committed_len) }
+            );
         }
         #[inline]
         fn on_stream_read_socket_blocked(
@@ -2853,7 +3603,10 @@ pub mod tracing {
         ) {
             let id = context.id();
             let api::StreamReadSocketBlocked { capacity } = event;
-            tracing :: event ! (target : "stream_read_socket_blocked" , parent : id , tracing :: Level :: DEBUG , { capacity = tracing :: field :: debug (capacity) });
+            tracing::event!(
+                target : "stream_read_socket_blocked", parent : id,
+                tracing::Level::DEBUG, { capacity = tracing::field::debug(capacity) }
+            );
         }
         #[inline]
         fn on_stream_read_socket_errored(
@@ -2864,7 +3617,11 @@ pub mod tracing {
         ) {
             let id = context.id();
             let api::StreamReadSocketErrored { capacity, errno } = event;
-            tracing :: event ! (target : "stream_read_socket_errored" , parent : id , tracing :: Level :: DEBUG , { capacity = tracing :: field :: debug (capacity) , errno = tracing :: field :: debug (errno) });
+            tracing::event!(
+                target : "stream_read_socket_errored", parent : id,
+                tracing::Level::DEBUG, { capacity = tracing::field::debug(capacity),
+                errno = tracing::field::debug(errno) }
+            );
         }
         #[inline]
         fn on_stream_decrypt_packet(
@@ -2879,13 +3636,58 @@ pub mod tracing {
                 forced_copy,
                 required_application_buffer,
             } = event;
-            tracing :: event ! (target : "stream_decrypt_packet" , parent : id , tracing :: Level :: DEBUG , { decrypted_in_place = tracing :: field :: debug (decrypted_in_place) , forced_copy = tracing :: field :: debug (forced_copy) , required_application_buffer = tracing :: field :: debug (required_application_buffer) });
+            tracing::event!(
+                target : "stream_decrypt_packet", parent : id, tracing::Level::DEBUG, {
+                decrypted_in_place = tracing::field::debug(decrypted_in_place),
+                forced_copy = tracing::field::debug(forced_copy),
+                required_application_buffer =
+                tracing::field::debug(required_application_buffer) }
+            );
         }
         #[inline]
         fn on_stream_tcp_connect(&self, meta: &api::EndpointMeta, event: &api::StreamTcpConnect) {
             let parent = self.parent(meta);
             let api::StreamTcpConnect { error, latency } = event;
-            tracing :: event ! (target : "stream_tcp_connect" , parent : parent , tracing :: Level :: DEBUG , { error = tracing :: field :: debug (error) , latency = tracing :: field :: debug (latency) });
+            tracing::event!(
+                target : "stream_tcp_connect", parent : parent, tracing::Level::DEBUG, {
+                error = tracing::field::debug(error), latency =
+                tracing::field::debug(latency) }
+            );
+        }
+        #[inline]
+        fn on_stream_tls_connect(&self, meta: &api::EndpointMeta, event: &api::StreamTlsConnect) {
+            let parent = self.parent(meta);
+            let api::StreamTlsConnect {
+                error,
+                remote_address,
+                tcp_latency,
+                tls_latency,
+            } = event;
+            tracing::event!(
+                target : "stream_tls_connect", parent : parent, tracing::Level::DEBUG, {
+                error = tracing::field::debug(error), remote_address =
+                tracing::field::debug(remote_address), tcp_latency =
+                tracing::field::debug(tcp_latency), tls_latency =
+                tracing::field::debug(tls_latency) }
+            );
+        }
+        #[inline]
+        fn on_stream_tls_connect_error(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::StreamTlsConnectError,
+        ) {
+            let parent = self.parent(meta);
+            let api::StreamTlsConnectError {
+                remote_address,
+                error,
+            } = event;
+            tracing::event!(
+                target : "stream_tls_connect_error", parent : parent,
+                tracing::Level::DEBUG, { remote_address =
+                tracing::field::debug(remote_address), error =
+                tracing::field::debug(error) }
+            );
         }
         #[inline]
         fn on_stream_connect(&self, meta: &api::EndpointMeta, event: &api::StreamConnect) {
@@ -2895,7 +3697,12 @@ pub mod tracing {
                 tcp_success,
                 handshake_success,
             } = event;
-            tracing :: event ! (target : "stream_connect" , parent : parent , tracing :: Level :: DEBUG , { error = tracing :: field :: debug (error) , tcp_success = tracing :: field :: debug (tcp_success) , handshake_success = tracing :: field :: debug (handshake_success) });
+            tracing::event!(
+                target : "stream_connect", parent : parent, tracing::Level::DEBUG, {
+                error = tracing::field::debug(error), tcp_success =
+                tracing::field::debug(tcp_success), handshake_success =
+                tracing::field::debug(handshake_success) }
+            );
         }
         #[inline]
         fn on_stream_connect_error(
@@ -2904,8 +3711,12 @@ pub mod tracing {
             event: &api::StreamConnectError,
         ) {
             let parent = self.parent(meta);
-            let api::StreamConnectError { reason } = event;
-            tracing :: event ! (target : "stream_connect_error" , parent : parent , tracing :: Level :: DEBUG , { reason = tracing :: field :: debug (reason) });
+            let api::StreamConnectError { reason, latency } = event;
+            tracing::event!(
+                target : "stream_connect_error", parent : parent, tracing::Level::DEBUG,
+                { reason = tracing::field::debug(reason), latency =
+                tracing::field::debug(latency) }
+            );
         }
         #[inline]
         fn on_stream_packet_transmitted(
@@ -2923,7 +3734,15 @@ pub mod tracing {
                 is_fin,
                 is_retransmission,
             } = event;
-            tracing :: event ! (target : "stream_packet_transmitted" , parent : id , tracing :: Level :: DEBUG , { packet_len = tracing :: field :: debug (packet_len) , payload_len = tracing :: field :: debug (payload_len) , packet_number = tracing :: field :: debug (packet_number) , stream_offset = tracing :: field :: debug (stream_offset) , is_fin = tracing :: field :: debug (is_fin) , is_retransmission = tracing :: field :: debug (is_retransmission) });
+            tracing::event!(
+                target : "stream_packet_transmitted", parent : id, tracing::Level::DEBUG,
+                { packet_len = tracing::field::debug(packet_len), payload_len =
+                tracing::field::debug(payload_len), packet_number =
+                tracing::field::debug(packet_number), stream_offset =
+                tracing::field::debug(stream_offset), is_fin =
+                tracing::field::debug(is_fin), is_retransmission =
+                tracing::field::debug(is_retransmission) }
+            );
         }
         #[inline]
         fn on_stream_probe_transmitted(
@@ -2937,7 +3756,11 @@ pub mod tracing {
                 packet_len,
                 packet_number,
             } = event;
-            tracing :: event ! (target : "stream_probe_transmitted" , parent : id , tracing :: Level :: DEBUG , { packet_len = tracing :: field :: debug (packet_len) , packet_number = tracing :: field :: debug (packet_number) });
+            tracing::event!(
+                target : "stream_probe_transmitted", parent : id, tracing::Level::DEBUG,
+                { packet_len = tracing::field::debug(packet_len), packet_number =
+                tracing::field::debug(packet_number) }
+            );
         }
         #[inline]
         fn on_stream_packet_received(
@@ -2955,7 +3778,15 @@ pub mod tracing {
                 is_fin,
                 is_retransmission,
             } = event;
-            tracing :: event ! (target : "stream_packet_received" , parent : id , tracing :: Level :: DEBUG , { packet_len = tracing :: field :: debug (packet_len) , payload_len = tracing :: field :: debug (payload_len) , packet_number = tracing :: field :: debug (packet_number) , stream_offset = tracing :: field :: debug (stream_offset) , is_fin = tracing :: field :: debug (is_fin) , is_retransmission = tracing :: field :: debug (is_retransmission) });
+            tracing::event!(
+                target : "stream_packet_received", parent : id, tracing::Level::DEBUG, {
+                packet_len = tracing::field::debug(packet_len), payload_len =
+                tracing::field::debug(payload_len), packet_number =
+                tracing::field::debug(packet_number), stream_offset =
+                tracing::field::debug(stream_offset), is_fin =
+                tracing::field::debug(is_fin), is_retransmission =
+                tracing::field::debug(is_retransmission) }
+            );
         }
         #[inline]
         fn on_stream_packet_lost(
@@ -2974,7 +3805,16 @@ pub mod tracing {
                 lifetime,
                 is_retransmission,
             } = event;
-            tracing :: event ! (target : "stream_packet_lost" , parent : id , tracing :: Level :: DEBUG , { packet_len = tracing :: field :: debug (packet_len) , payload_len = tracing :: field :: debug (payload_len) , packet_number = tracing :: field :: debug (packet_number) , stream_offset = tracing :: field :: debug (stream_offset) , time_sent = tracing :: field :: debug (time_sent) , lifetime = tracing :: field :: debug (lifetime) , is_retransmission = tracing :: field :: debug (is_retransmission) });
+            tracing::event!(
+                target : "stream_packet_lost", parent : id, tracing::Level::DEBUG, {
+                packet_len = tracing::field::debug(packet_len), payload_len =
+                tracing::field::debug(payload_len), packet_number =
+                tracing::field::debug(packet_number), stream_offset =
+                tracing::field::debug(stream_offset), time_sent =
+                tracing::field::debug(time_sent), lifetime =
+                tracing::field::debug(lifetime), is_retransmission =
+                tracing::field::debug(is_retransmission) }
+            );
         }
         #[inline]
         fn on_stream_packet_acked(
@@ -2993,7 +3833,16 @@ pub mod tracing {
                 lifetime,
                 is_retransmission,
             } = event;
-            tracing :: event ! (target : "stream_packet_acked" , parent : id , tracing :: Level :: DEBUG , { packet_len = tracing :: field :: debug (packet_len) , payload_len = tracing :: field :: debug (payload_len) , packet_number = tracing :: field :: debug (packet_number) , stream_offset = tracing :: field :: debug (stream_offset) , time_sent = tracing :: field :: debug (time_sent) , lifetime = tracing :: field :: debug (lifetime) , is_retransmission = tracing :: field :: debug (is_retransmission) });
+            tracing::event!(
+                target : "stream_packet_acked", parent : id, tracing::Level::DEBUG, {
+                packet_len = tracing::field::debug(packet_len), payload_len =
+                tracing::field::debug(payload_len), packet_number =
+                tracing::field::debug(packet_number), stream_offset =
+                tracing::field::debug(stream_offset), time_sent =
+                tracing::field::debug(time_sent), lifetime =
+                tracing::field::debug(lifetime), is_retransmission =
+                tracing::field::debug(is_retransmission) }
+            );
         }
         #[inline]
         fn on_stream_packet_spuriously_retransmitted(
@@ -3011,7 +3860,15 @@ pub mod tracing {
                 is_fin,
                 is_retransmission,
             } = event;
-            tracing :: event ! (target : "stream_packet_spuriously_retransmitted" , parent : id , tracing :: Level :: DEBUG , { packet_len = tracing :: field :: debug (packet_len) , payload_len = tracing :: field :: debug (payload_len) , packet_number = tracing :: field :: debug (packet_number) , stream_offset = tracing :: field :: debug (stream_offset) , is_fin = tracing :: field :: debug (is_fin) , is_retransmission = tracing :: field :: debug (is_retransmission) });
+            tracing::event!(
+                target : "stream_packet_spuriously_retransmitted", parent : id,
+                tracing::Level::DEBUG, { packet_len = tracing::field::debug(packet_len),
+                payload_len = tracing::field::debug(payload_len), packet_number =
+                tracing::field::debug(packet_number), stream_offset =
+                tracing::field::debug(stream_offset), is_fin =
+                tracing::field::debug(is_fin), is_retransmission =
+                tracing::field::debug(is_retransmission) }
+            );
         }
         #[inline]
         fn on_stream_max_data_received(
@@ -3025,7 +3882,11 @@ pub mod tracing {
                 increase,
                 new_max_data,
             } = event;
-            tracing :: event ! (target : "stream_max_data_received" , parent : id , tracing :: Level :: DEBUG , { increase = tracing :: field :: debug (increase) , new_max_data = tracing :: field :: debug (new_max_data) });
+            tracing::event!(
+                target : "stream_max_data_received", parent : id, tracing::Level::DEBUG,
+                { increase = tracing::field::debug(increase), new_max_data =
+                tracing::field::debug(new_max_data) }
+            );
         }
         #[inline]
         fn on_stream_control_packet_transmitted(
@@ -3040,7 +3901,12 @@ pub mod tracing {
                 control_data_len,
                 packet_number,
             } = event;
-            tracing :: event ! (target : "stream_control_packet_transmitted" , parent : id , tracing :: Level :: DEBUG , { packet_len = tracing :: field :: debug (packet_len) , control_data_len = tracing :: field :: debug (control_data_len) , packet_number = tracing :: field :: debug (packet_number) });
+            tracing::event!(
+                target : "stream_control_packet_transmitted", parent : id,
+                tracing::Level::DEBUG, { packet_len = tracing::field::debug(packet_len),
+                control_data_len = tracing::field::debug(control_data_len), packet_number
+                = tracing::field::debug(packet_number) }
+            );
         }
         #[inline]
         fn on_stream_control_packet_received(
@@ -3056,7 +3922,13 @@ pub mod tracing {
                 packet_number,
                 is_authenticated,
             } = event;
-            tracing :: event ! (target : "stream_control_packet_received" , parent : id , tracing :: Level :: DEBUG , { packet_len = tracing :: field :: debug (packet_len) , control_data_len = tracing :: field :: debug (control_data_len) , packet_number = tracing :: field :: debug (packet_number) , is_authenticated = tracing :: field :: debug (is_authenticated) });
+            tracing::event!(
+                target : "stream_control_packet_received", parent : id,
+                tracing::Level::DEBUG, { packet_len = tracing::field::debug(packet_len),
+                control_data_len = tracing::field::debug(control_data_len), packet_number
+                = tracing::field::debug(packet_number), is_authenticated =
+                tracing::field::debug(is_authenticated) }
+            );
         }
         #[inline]
         fn on_stream_receiver_errored(
@@ -3067,7 +3939,11 @@ pub mod tracing {
         ) {
             let id = context.id();
             let api::StreamReceiverErrored { error, source } = event;
-            tracing :: event ! (target : "stream_receiver_errored" , parent : id , tracing :: Level :: DEBUG , { error = tracing :: field :: debug (error) , source = tracing :: field :: debug (source) });
+            tracing::event!(
+                target : "stream_receiver_errored", parent : id, tracing::Level::DEBUG, {
+                error = tracing::field::debug(error), source =
+                tracing::field::debug(source) }
+            );
         }
         #[inline]
         fn on_stream_sender_errored(
@@ -3078,7 +3954,25 @@ pub mod tracing {
         ) {
             let id = context.id();
             let api::StreamSenderErrored { error, source } = event;
-            tracing :: event ! (target : "stream_sender_errored" , parent : id , tracing :: Level :: DEBUG , { error = tracing :: field :: debug (error) , source = tracing :: field :: debug (source) });
+            tracing::event!(
+                target : "stream_sender_errored", parent : id, tracing::Level::DEBUG, {
+                error = tracing::field::debug(error), source =
+                tracing::field::debug(source) }
+            );
+        }
+        #[inline]
+        fn on_stream_handshake_packet_rejected(
+            &self,
+            context: &Self::ConnectionContext,
+            _meta: &api::ConnectionMeta,
+            event: &api::StreamHandshakePacketRejected,
+        ) {
+            let id = context.id();
+            let api::StreamHandshakePacketRejected { reason } = event;
+            tracing::event!(
+                target : "stream_handshake_packet_rejected", parent : id,
+                tracing::Level::DEBUG, { reason = tracing::field::debug(reason) }
+            );
         }
         #[inline]
         fn on_connection_closed(
@@ -3089,7 +3983,9 @@ pub mod tracing {
         ) {
             let id = context.id();
             let api::ConnectionClosed {} = event;
-            tracing :: event ! (target : "connection_closed" , parent : id , tracing :: Level :: DEBUG , { });
+            tracing::event!(
+                target : "connection_closed", parent : id, tracing::Level::DEBUG, {}
+            );
         }
         #[inline]
         fn on_endpoint_initialized(
@@ -3104,7 +4000,25 @@ pub mod tracing {
                 tcp,
                 udp,
             } = event;
-            tracing :: event ! (target : "endpoint_initialized" , parent : parent , tracing :: Level :: DEBUG , { acceptor_addr = tracing :: field :: debug (acceptor_addr) , handshake_addr = tracing :: field :: debug (handshake_addr) , tcp = tracing :: field :: debug (tcp) , udp = tracing :: field :: debug (udp) });
+            tracing::event!(
+                target : "endpoint_initialized", parent : parent, tracing::Level::DEBUG,
+                { acceptor_addr = tracing::field::debug(acceptor_addr), handshake_addr =
+                tracing::field::debug(handshake_addr), tcp = tracing::field::debug(tcp),
+                udp = tracing::field::debug(udp) }
+            );
+        }
+        #[inline]
+        fn on_dc_connection_timeout(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::DcConnectionTimeout,
+        ) {
+            let parent = self.parent(meta);
+            let api::DcConnectionTimeout { peer_address } = event;
+            tracing::event!(
+                target : "dc_connection_timeout", parent : parent, tracing::Level::DEBUG,
+                { peer_address = tracing::field::debug(peer_address) }
+            );
         }
         #[inline]
         fn on_path_secret_map_initialized(
@@ -3114,7 +4028,10 @@ pub mod tracing {
         ) {
             let parent = self.parent(meta);
             let api::PathSecretMapInitialized { capacity } = event;
-            tracing :: event ! (target : "path_secret_map_initialized" , parent : parent , tracing :: Level :: DEBUG , { capacity = tracing :: field :: debug (capacity) });
+            tracing::event!(
+                target : "path_secret_map_initialized", parent : parent,
+                tracing::Level::DEBUG, { capacity = tracing::field::debug(capacity) }
+            );
         }
         #[inline]
         fn on_path_secret_map_uninitialized(
@@ -3128,7 +4045,12 @@ pub mod tracing {
                 entries,
                 lifetime,
             } = event;
-            tracing :: event ! (target : "path_secret_map_uninitialized" , parent : parent , tracing :: Level :: DEBUG , { capacity = tracing :: field :: debug (capacity) , entries = tracing :: field :: debug (entries) , lifetime = tracing :: field :: debug (lifetime) });
+            tracing::event!(
+                target : "path_secret_map_uninitialized", parent : parent,
+                tracing::Level::DEBUG, { capacity = tracing::field::debug(capacity),
+                entries = tracing::field::debug(entries), lifetime =
+                tracing::field::debug(lifetime) }
+            );
         }
         #[inline]
         fn on_path_secret_map_background_handshake_requested(
@@ -3138,7 +4060,11 @@ pub mod tracing {
         ) {
             let parent = self.parent(meta);
             let api::PathSecretMapBackgroundHandshakeRequested { peer_address } = event;
-            tracing :: event ! (target : "path_secret_map_background_handshake_requested" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) });
+            tracing::event!(
+                target : "path_secret_map_background_handshake_requested", parent :
+                parent, tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address) }
+            );
         }
         #[inline]
         fn on_path_secret_map_entry_inserted(
@@ -3151,7 +4077,12 @@ pub mod tracing {
                 peer_address,
                 credential_id,
             } = event;
-            tracing :: event ! (target : "path_secret_map_entry_inserted" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "path_secret_map_entry_inserted", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id) }
+            );
         }
         #[inline]
         fn on_path_secret_map_entry_ready(
@@ -3164,7 +4095,12 @@ pub mod tracing {
                 peer_address,
                 credential_id,
             } = event;
-            tracing :: event ! (target : "path_secret_map_entry_ready" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "path_secret_map_entry_ready", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id) }
+            );
         }
         #[inline]
         fn on_path_secret_map_entry_replaced(
@@ -3177,8 +4113,16 @@ pub mod tracing {
                 peer_address,
                 new_credential_id,
                 previous_credential_id,
+                replaced_age,
             } = event;
-            tracing :: event ! (target : "path_secret_map_entry_replaced" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , new_credential_id = tracing :: field :: debug (new_credential_id) , previous_credential_id = tracing :: field :: debug (previous_credential_id) });
+            tracing::event!(
+                target : "path_secret_map_entry_replaced", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), new_credential_id =
+                tracing::field::debug(new_credential_id), previous_credential_id =
+                tracing::field::debug(previous_credential_id), replaced_age =
+                tracing::field::debug(replaced_age) }
+            );
         }
         #[inline]
         fn on_path_secret_map_id_entry_evicted(
@@ -3191,8 +4135,18 @@ pub mod tracing {
                 peer_address,
                 credential_id,
                 age,
+                time_since_last_accessed,
+                reason,
             } = event;
-            tracing :: event ! (target : "path_secret_map_id_entry_evicted" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) , age = tracing :: field :: debug (age) });
+            tracing::event!(
+                target : "path_secret_map_id_entry_evicted", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id), age = tracing::field::debug(age),
+                time_since_last_accessed =
+                tracing::field::debug(time_since_last_accessed), reason =
+                tracing::field::debug(reason) }
+            );
         }
         #[inline]
         fn on_path_secret_map_address_entry_evicted(
@@ -3205,8 +4159,18 @@ pub mod tracing {
                 peer_address,
                 credential_id,
                 age,
+                time_since_last_accessed,
+                reason,
             } = event;
-            tracing :: event ! (target : "path_secret_map_address_entry_evicted" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) , age = tracing :: field :: debug (age) });
+            tracing::event!(
+                target : "path_secret_map_address_entry_evicted", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id), age = tracing::field::debug(age),
+                time_since_last_accessed =
+                tracing::field::debug(time_since_last_accessed), reason =
+                tracing::field::debug(reason) }
+            );
         }
         #[inline]
         fn on_unknown_path_secret_packet_sent(
@@ -3219,7 +4183,12 @@ pub mod tracing {
                 peer_address,
                 credential_id,
             } = event;
-            tracing :: event ! (target : "unknown_path_secret_packet_sent" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "unknown_path_secret_packet_sent", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id) }
+            );
         }
         #[inline]
         fn on_unknown_path_secret_packet_received(
@@ -3232,7 +4201,12 @@ pub mod tracing {
                 peer_address,
                 credential_id,
             } = event;
-            tracing :: event ! (target : "unknown_path_secret_packet_received" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "unknown_path_secret_packet_received", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id) }
+            );
         }
         #[inline]
         fn on_unknown_path_secret_packet_accepted(
@@ -3244,8 +4218,18 @@ pub mod tracing {
             let api::UnknownPathSecretPacketAccepted {
                 peer_address,
                 credential_id,
+                age,
+                evicted,
+                scheduled_handshake,
             } = event;
-            tracing :: event ! (target : "unknown_path_secret_packet_accepted" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "unknown_path_secret_packet_accepted", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id), age = tracing::field::debug(age),
+                evicted = tracing::field::debug(evicted), scheduled_handshake =
+                tracing::field::debug(scheduled_handshake) }
+            );
         }
         #[inline]
         fn on_unknown_path_secret_packet_rejected(
@@ -3258,7 +4242,12 @@ pub mod tracing {
                 peer_address,
                 credential_id,
             } = event;
-            tracing :: event ! (target : "unknown_path_secret_packet_rejected" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "unknown_path_secret_packet_rejected", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id) }
+            );
         }
         #[inline]
         fn on_unknown_path_secret_packet_dropped(
@@ -3271,7 +4260,12 @@ pub mod tracing {
                 peer_address,
                 credential_id,
             } = event;
-            tracing :: event ! (target : "unknown_path_secret_packet_dropped" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "unknown_path_secret_packet_dropped", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id) }
+            );
         }
         #[inline]
         fn on_key_accepted(&self, meta: &api::EndpointMeta, event: &api::KeyAccepted) {
@@ -3282,7 +4276,12 @@ pub mod tracing {
                 gap,
                 forward_shift,
             } = event;
-            tracing :: event ! (target : "key_accepted" , parent : parent , tracing :: Level :: DEBUG , { credential_id = tracing :: field :: debug (credential_id) , key_id = tracing :: field :: debug (key_id) , gap = tracing :: field :: debug (gap) , forward_shift = tracing :: field :: debug (forward_shift) });
+            tracing::event!(
+                target : "key_accepted", parent : parent, tracing::Level::DEBUG, {
+                credential_id = tracing::field::debug(credential_id), key_id =
+                tracing::field::debug(key_id), gap = tracing::field::debug(gap),
+                forward_shift = tracing::field::debug(forward_shift) }
+            );
         }
         #[inline]
         fn on_replay_definitely_detected(
@@ -3295,7 +4294,12 @@ pub mod tracing {
                 credential_id,
                 key_id,
             } = event;
-            tracing :: event ! (target : "replay_definitely_detected" , parent : parent , tracing :: Level :: DEBUG , { credential_id = tracing :: field :: debug (credential_id) , key_id = tracing :: field :: debug (key_id) });
+            tracing::event!(
+                target : "replay_definitely_detected", parent : parent,
+                tracing::Level::DEBUG, { credential_id =
+                tracing::field::debug(credential_id), key_id =
+                tracing::field::debug(key_id) }
+            );
         }
         #[inline]
         fn on_replay_potentially_detected(
@@ -3309,7 +4313,12 @@ pub mod tracing {
                 key_id,
                 gap,
             } = event;
-            tracing :: event ! (target : "replay_potentially_detected" , parent : parent , tracing :: Level :: DEBUG , { credential_id = tracing :: field :: debug (credential_id) , key_id = tracing :: field :: debug (key_id) , gap = tracing :: field :: debug (gap) });
+            tracing::event!(
+                target : "replay_potentially_detected", parent : parent,
+                tracing::Level::DEBUG, { credential_id =
+                tracing::field::debug(credential_id), key_id =
+                tracing::field::debug(key_id), gap = tracing::field::debug(gap) }
+            );
         }
         #[inline]
         fn on_replay_detected_packet_sent(
@@ -3322,7 +4331,12 @@ pub mod tracing {
                 peer_address,
                 credential_id,
             } = event;
-            tracing :: event ! (target : "replay_detected_packet_sent" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "replay_detected_packet_sent", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id) }
+            );
         }
         #[inline]
         fn on_replay_detected_packet_received(
@@ -3335,7 +4349,12 @@ pub mod tracing {
                 peer_address,
                 credential_id,
             } = event;
-            tracing :: event ! (target : "replay_detected_packet_received" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "replay_detected_packet_received", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id) }
+            );
         }
         #[inline]
         fn on_replay_detected_packet_accepted(
@@ -3349,7 +4368,13 @@ pub mod tracing {
                 credential_id,
                 key_id,
             } = event;
-            tracing :: event ! (target : "replay_detected_packet_accepted" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) , key_id = tracing :: field :: debug (key_id) });
+            tracing::event!(
+                target : "replay_detected_packet_accepted", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id), key_id =
+                tracing::field::debug(key_id) }
+            );
         }
         #[inline]
         fn on_replay_detected_packet_rejected(
@@ -3362,7 +4387,12 @@ pub mod tracing {
                 peer_address,
                 credential_id,
             } = event;
-            tracing :: event ! (target : "replay_detected_packet_rejected" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "replay_detected_packet_rejected", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id) }
+            );
         }
         #[inline]
         fn on_replay_detected_packet_dropped(
@@ -3375,7 +4405,12 @@ pub mod tracing {
                 peer_address,
                 credential_id,
             } = event;
-            tracing :: event ! (target : "replay_detected_packet_dropped" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "replay_detected_packet_dropped", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id) }
+            );
         }
         #[inline]
         fn on_stale_key_packet_sent(
@@ -3388,7 +4423,11 @@ pub mod tracing {
                 peer_address,
                 credential_id,
             } = event;
-            tracing :: event ! (target : "stale_key_packet_sent" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "stale_key_packet_sent", parent : parent, tracing::Level::DEBUG,
+                { peer_address = tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id) }
+            );
         }
         #[inline]
         fn on_stale_key_packet_received(
@@ -3401,7 +4440,12 @@ pub mod tracing {
                 peer_address,
                 credential_id,
             } = event;
-            tracing :: event ! (target : "stale_key_packet_received" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "stale_key_packet_received", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id) }
+            );
         }
         #[inline]
         fn on_stale_key_packet_accepted(
@@ -3414,7 +4458,12 @@ pub mod tracing {
                 peer_address,
                 credential_id,
             } = event;
-            tracing :: event ! (target : "stale_key_packet_accepted" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "stale_key_packet_accepted", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id) }
+            );
         }
         #[inline]
         fn on_stale_key_packet_rejected(
@@ -3427,7 +4476,12 @@ pub mod tracing {
                 peer_address,
                 credential_id,
             } = event;
-            tracing :: event ! (target : "stale_key_packet_rejected" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "stale_key_packet_rejected", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id) }
+            );
         }
         #[inline]
         fn on_stale_key_packet_dropped(
@@ -3440,7 +4494,12 @@ pub mod tracing {
                 peer_address,
                 credential_id,
             } = event;
-            tracing :: event ! (target : "stale_key_packet_dropped" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , credential_id = tracing :: field :: debug (credential_id) });
+            tracing::event!(
+                target : "stale_key_packet_dropped", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), credential_id =
+                tracing::field::debug(credential_id) }
+            );
         }
         #[inline]
         fn on_path_secret_map_address_cache_accessed(
@@ -3450,7 +4509,11 @@ pub mod tracing {
         ) {
             let parent = self.parent(meta);
             let api::PathSecretMapAddressCacheAccessed { peer_address, hit } = event;
-            tracing :: event ! (target : "path_secret_map_address_cache_accessed" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , hit = tracing :: field :: debug (hit) });
+            tracing::event!(
+                target : "path_secret_map_address_cache_accessed", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), hit = tracing::field::debug(hit) }
+            );
         }
         #[inline]
         fn on_path_secret_map_address_cache_accessed_hit(
@@ -3460,7 +4523,11 @@ pub mod tracing {
         ) {
             let parent = self.parent(meta);
             let api::PathSecretMapAddressCacheAccessedHit { peer_address, age } = event;
-            tracing :: event ! (target : "path_secret_map_address_cache_accessed_hit" , parent : parent , tracing :: Level :: DEBUG , { peer_address = tracing :: field :: debug (peer_address) , age = tracing :: field :: debug (age) });
+            tracing::event!(
+                target : "path_secret_map_address_cache_accessed_hit", parent : parent,
+                tracing::Level::DEBUG, { peer_address =
+                tracing::field::debug(peer_address), age = tracing::field::debug(age) }
+            );
         }
         #[inline]
         fn on_path_secret_map_id_cache_accessed(
@@ -3470,7 +4537,11 @@ pub mod tracing {
         ) {
             let parent = self.parent(meta);
             let api::PathSecretMapIdCacheAccessed { credential_id, hit } = event;
-            tracing :: event ! (target : "path_secret_map_id_cache_accessed" , parent : parent , tracing :: Level :: DEBUG , { credential_id = tracing :: field :: debug (credential_id) , hit = tracing :: field :: debug (hit) });
+            tracing::event!(
+                target : "path_secret_map_id_cache_accessed", parent : parent,
+                tracing::Level::DEBUG, { credential_id =
+                tracing::field::debug(credential_id), hit = tracing::field::debug(hit) }
+            );
         }
         #[inline]
         fn on_path_secret_map_id_cache_accessed_hit(
@@ -3480,7 +4551,11 @@ pub mod tracing {
         ) {
             let parent = self.parent(meta);
             let api::PathSecretMapIdCacheAccessedHit { credential_id, age } = event;
-            tracing :: event ! (target : "path_secret_map_id_cache_accessed_hit" , parent : parent , tracing :: Level :: DEBUG , { credential_id = tracing :: field :: debug (credential_id) , age = tracing :: field :: debug (age) });
+            tracing::event!(
+                target : "path_secret_map_id_cache_accessed_hit", parent : parent,
+                tracing::Level::DEBUG, { credential_id =
+                tracing::field::debug(credential_id), age = tracing::field::debug(age) }
+            );
         }
         #[inline]
         fn on_path_secret_map_cleaner_cycled(
@@ -3502,12 +4577,62 @@ pub mod tracing {
                 address_entries_retired,
                 address_entries_utilization,
                 address_entries_initial_utilization,
+                id_entries_in_last_hs_period,
+                id_entries_in_last_hs_period_utilization,
                 handshake_requests,
-                handshake_requests_retired,
+                handshake_requests_skipped,
                 handshake_lock_duration,
                 duration,
             } = event;
-            tracing :: event ! (target : "path_secret_map_cleaner_cycled" , parent : parent , tracing :: Level :: DEBUG , { id_entries = tracing :: field :: debug (id_entries) , id_entries_retired = tracing :: field :: debug (id_entries_retired) , id_entries_active = tracing :: field :: debug (id_entries_active) , id_entries_active_utilization = tracing :: field :: debug (id_entries_active_utilization) , id_entries_utilization = tracing :: field :: debug (id_entries_utilization) , id_entries_initial_utilization = tracing :: field :: debug (id_entries_initial_utilization) , address_entries = tracing :: field :: debug (address_entries) , address_entries_active = tracing :: field :: debug (address_entries_active) , address_entries_active_utilization = tracing :: field :: debug (address_entries_active_utilization) , address_entries_retired = tracing :: field :: debug (address_entries_retired) , address_entries_utilization = tracing :: field :: debug (address_entries_utilization) , address_entries_initial_utilization = tracing :: field :: debug (address_entries_initial_utilization) , handshake_requests = tracing :: field :: debug (handshake_requests) , handshake_requests_retired = tracing :: field :: debug (handshake_requests_retired) , handshake_lock_duration = tracing :: field :: debug (handshake_lock_duration) , duration = tracing :: field :: debug (duration) });
+            tracing::event!(
+                target : "path_secret_map_cleaner_cycled", parent : parent,
+                tracing::Level::DEBUG, { id_entries = tracing::field::debug(id_entries),
+                id_entries_retired = tracing::field::debug(id_entries_retired),
+                id_entries_active = tracing::field::debug(id_entries_active),
+                id_entries_active_utilization =
+                tracing::field::debug(id_entries_active_utilization),
+                id_entries_utilization = tracing::field::debug(id_entries_utilization),
+                id_entries_initial_utilization =
+                tracing::field::debug(id_entries_initial_utilization), address_entries =
+                tracing::field::debug(address_entries), address_entries_active =
+                tracing::field::debug(address_entries_active),
+                address_entries_active_utilization =
+                tracing::field::debug(address_entries_active_utilization),
+                address_entries_retired = tracing::field::debug(address_entries_retired),
+                address_entries_utilization =
+                tracing::field::debug(address_entries_utilization),
+                address_entries_initial_utilization =
+                tracing::field::debug(address_entries_initial_utilization),
+                id_entries_in_last_hs_period =
+                tracing::field::debug(id_entries_in_last_hs_period),
+                id_entries_in_last_hs_period_utilization =
+                tracing::field::debug(id_entries_in_last_hs_period_utilization),
+                handshake_requests = tracing::field::debug(handshake_requests),
+                handshake_requests_skipped =
+                tracing::field::debug(handshake_requests_skipped),
+                handshake_lock_duration = tracing::field::debug(handshake_lock_duration),
+                duration = tracing::field::debug(duration) }
+            );
+        }
+        #[inline]
+        fn on_path_secret_map_serialized(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::PathSecretMapSerialized,
+        ) {
+            let parent = self.parent(meta);
+            let api::PathSecretMapSerialized {
+                entries,
+                file_size,
+                duration,
+                error,
+            } = event;
+            tracing::event!(
+                target : "path_secret_map_serialized", parent : parent,
+                tracing::Level::DEBUG, { entries = tracing::field::debug(entries),
+                file_size = tracing::field::debug(file_size), duration =
+                tracing::field::debug(duration), error = tracing::field::debug(error) }
+            );
         }
         #[inline]
         fn on_path_secret_map_id_write_lock(
@@ -3517,7 +4642,11 @@ pub mod tracing {
         ) {
             let parent = self.parent(meta);
             let api::PathSecretMapIdWriteLock { acquire, duration } = event;
-            tracing :: event ! (target : "path_secret_map_id_write_lock" , parent : parent , tracing :: Level :: DEBUG , { acquire = tracing :: field :: debug (acquire) , duration = tracing :: field :: debug (duration) });
+            tracing::event!(
+                target : "path_secret_map_id_write_lock", parent : parent,
+                tracing::Level::DEBUG, { acquire = tracing::field::debug(acquire),
+                duration = tracing::field::debug(duration) }
+            );
         }
         #[inline]
         fn on_path_secret_map_address_write_lock(
@@ -3527,7 +4656,37 @@ pub mod tracing {
         ) {
             let parent = self.parent(meta);
             let api::PathSecretMapAddressWriteLock { acquire, duration } = event;
-            tracing :: event ! (target : "path_secret_map_address_write_lock" , parent : parent , tracing :: Level :: DEBUG , { acquire = tracing :: field :: debug (acquire) , duration = tracing :: field :: debug (duration) });
+            tracing::event!(
+                target : "path_secret_map_address_write_lock", parent : parent,
+                tracing::Level::DEBUG, { acquire = tracing::field::debug(acquire),
+                duration = tracing::field::debug(duration) }
+            );
+        }
+        #[inline]
+        fn on_path_secret_map_datagram_encrypt(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::PathSecretMapDatagramEncrypt,
+        ) {
+            let parent = self.parent(meta);
+            let api::PathSecretMapDatagramEncrypt { packet_len } = event;
+            tracing::event!(
+                target : "path_secret_map_datagram_encrypt", parent : parent,
+                tracing::Level::DEBUG, { packet_len = tracing::field::debug(packet_len) }
+            );
+        }
+        #[inline]
+        fn on_path_secret_map_datagram_decrypt(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::PathSecretMapDatagramDecrypt,
+        ) {
+            let parent = self.parent(meta);
+            let api::PathSecretMapDatagramDecrypt { packet_len } = event;
+            tracing::event!(
+                target : "path_secret_map_datagram_decrypt", parent : parent,
+                tracing::Level::DEBUG, { packet_len = tracing::field::debug(packet_len) }
+            );
         }
     }
 }
@@ -3535,13 +4694,13 @@ pub mod builder {
     use super::*;
     pub use s2n_quic_core::event::builder::{EndpointType, SocketAddress, Subject};
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when a TCP acceptor is started"]
+    /// Emitted when a TCP acceptor is started
     pub struct AcceptorTcpStarted<'a> {
-        #[doc = " The id of the acceptor worker"]
+        /// The id of the acceptor worker
         pub id: usize,
-        #[doc = " The local address of the acceptor"]
+        /// The local address of the acceptor
         pub local_address: &'a s2n_quic_core::inet::SocketAddress,
-        #[doc = " The backlog size"]
+        /// The backlog size
         pub backlog: usize,
     }
     impl<'a> IntoEvent<api::AcceptorTcpStarted<'a>> for AcceptorTcpStarted<'a> {
@@ -3560,20 +4719,20 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when a TCP acceptor completes a single iteration of the event loop"]
+    /// Emitted when a TCP acceptor completes a single iteration of the event loop
     pub struct AcceptorTcpLoopIterationCompleted {
-        #[doc = " The number of streams that are waiting on initial packets"]
+        /// The number of streams that are waiting on initial packets
         pub pending_streams: usize,
-        #[doc = " The number of slots that are not currently processing a stream"]
+        /// The number of slots that are not currently processing a stream
         pub slots_idle: usize,
-        #[doc = " The percentage of slots currently processing streams"]
+        /// The percentage of slots currently processing streams
         pub slot_utilization: f32,
-        #[doc = " The amount of time it took to complete the iteration"]
+        /// The amount of time it took to complete the iteration
         pub processing_duration: core::time::Duration,
-        #[doc = " The computed max sojourn time that is allowed for streams"]
-        #[doc = ""]
-        #[doc = " If streams consume more time than this value to initialize, they"]
-        #[doc = " may potentially be replaced by more recent streams."]
+        /// The computed max sojourn time that is allowed for streams
+        ///
+        /// If streams consume more time than this value to initialize, they
+        /// may potentially be replaced by more recent streams.
         pub max_sojourn_time: core::time::Duration,
     }
     impl IntoEvent<api::AcceptorTcpLoopIterationCompleted> for AcceptorTcpLoopIterationCompleted {
@@ -3596,9 +4755,9 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when a fresh TCP stream is enqueued for processing"]
+    /// Emitted when a fresh TCP stream is enqueued for processing
     pub struct AcceptorTcpFreshEnqueued<'a> {
-        #[doc = " The remote address of the TCP stream"]
+        /// The remote address of the TCP stream
         pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
     }
     impl<'a> IntoEvent<api::AcceptorTcpFreshEnqueued<'a>> for AcceptorTcpFreshEnqueued<'a> {
@@ -3611,13 +4770,13 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when a the TCP acceptor has completed a batch of stream enqueues"]
+    /// Emitted when a the TCP acceptor has completed a batch of stream enqueues
     pub struct AcceptorTcpFreshBatchCompleted {
-        #[doc = " The number of fresh TCP streams enqueued in this batch"]
+        /// The number of fresh TCP streams enqueued in this batch
         pub enqueued: usize,
-        #[doc = " The number of fresh TCP streams dropped in this batch due to capacity limits"]
+        /// The number of fresh TCP streams dropped in this batch due to capacity limits
         pub dropped: usize,
-        #[doc = " The number of TCP streams that errored in this batch"]
+        /// The number of TCP streams that errored in this batch
         pub errored: usize,
     }
     impl IntoEvent<api::AcceptorTcpFreshBatchCompleted> for AcceptorTcpFreshBatchCompleted {
@@ -3636,9 +4795,9 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when a TCP stream has been dropped"]
+    /// Emitted when a TCP stream has been dropped
     pub struct AcceptorTcpStreamDropped<'a> {
-        #[doc = " The remote address of the TCP stream"]
+        /// The remote address of the TCP stream
         pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
         pub reason: AcceptorTcpStreamDropReason,
     }
@@ -3656,14 +4815,14 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when a TCP stream has been replaced by another stream"]
+    /// Emitted when a TCP stream has been replaced by another stream
     pub struct AcceptorTcpStreamReplaced<'a> {
-        #[doc = " The remote address of the stream being replaced"]
+        /// The remote address of the stream being replaced
         pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
-        #[doc = " The amount of time that the stream spent in the accept queue before"]
-        #[doc = " being replaced with another"]
+        /// The amount of time that the stream spent in the accept queue before
+        /// being replaced with another
         pub sojourn_time: core::time::Duration,
-        #[doc = " The amount of bytes buffered on the stream"]
+        /// The amount of bytes buffered on the stream
         pub buffer_len: usize,
     }
     impl<'a> IntoEvent<api::AcceptorTcpStreamReplaced<'a>> for AcceptorTcpStreamReplaced<'a> {
@@ -3682,22 +4841,22 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when a full packet has been received on the TCP stream"]
+    /// Emitted when a full packet has been received on the TCP stream
     pub struct AcceptorTcpPacketReceived<'a> {
-        #[doc = " The address of the packet's sender"]
+        /// The address of the packet's sender
         pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
-        #[doc = " The credential ID of the packet"]
+        /// The credential ID of the packet
         pub credential_id: &'a [u8],
-        #[doc = " The stream ID of the packet"]
+        /// The stream ID of the packet
         pub stream_id: u64,
-        #[doc = " The payload length of the packet"]
+        /// The payload length of the packet
         pub payload_len: usize,
-        #[doc = " If the packet includes the final bytes of the stream"]
+        /// If the packet includes the final bytes of the stream
         pub is_fin: bool,
-        #[doc = " If the packet includes the final offset of the stream"]
+        /// If the packet includes the final offset of the stream
         pub is_fin_known: bool,
-        #[doc = " The amount of time the TCP stream spent in the queue before receiving"]
-        #[doc = " the initial packet"]
+        /// The amount of time the TCP stream spent in the queue before receiving
+        /// the initial packet
         pub sojourn_time: core::time::Duration,
     }
     impl<'a> IntoEvent<api::AcceptorTcpPacketReceived<'a>> for AcceptorTcpPacketReceived<'a> {
@@ -3724,14 +4883,122 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when the TCP acceptor received an invalid initial packet"]
-    pub struct AcceptorTcpPacketDropped<'a> {
-        #[doc = " The address of the packet's sender"]
+    /// Emitted when a TLS ClientHello has been recognized on the TCP stream
+    pub struct AcceptorTcpTlsStarted<'a> {
+        /// The address of the packet's sender
         pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
-        #[doc = " The reason the packet was dropped"]
+        /// The amount of time the TCP stream spent in the queue so far
+        pub sojourn_time: core::time::Duration,
+    }
+    impl<'a> IntoEvent<api::AcceptorTcpTlsStarted<'a>> for AcceptorTcpTlsStarted<'a> {
+        #[inline]
+        fn into_event(self) -> api::AcceptorTcpTlsStarted<'a> {
+            let AcceptorTcpTlsStarted {
+                remote_address,
+                sojourn_time,
+            } = self;
+            api::AcceptorTcpTlsStarted {
+                remote_address: remote_address.into_event(),
+                sojourn_time: sojourn_time.into_event(),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    /// Emitted when a TLS stream is enqueued to the application accept queue
+    pub struct AcceptorTcpTlsStreamEnqueued<'a> {
+        /// The address of the packet's sender
+        pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
+        /// The amount of time the TCP stream spent on handshaking before enqueuing to the application
+        /// since being accepted from the kernel
+        pub sojourn_time: core::time::Duration,
+    }
+    impl<'a> IntoEvent<api::AcceptorTcpTlsStreamEnqueued<'a>> for AcceptorTcpTlsStreamEnqueued<'a> {
+        #[inline]
+        fn into_event(self) -> api::AcceptorTcpTlsStreamEnqueued<'a> {
+            let AcceptorTcpTlsStreamEnqueued {
+                remote_address,
+                sojourn_time,
+            } = self;
+            api::AcceptorTcpTlsStreamEnqueued {
+                remote_address: remote_address.into_event(),
+                sojourn_time: sojourn_time.into_event(),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    /// Emitted when a TLS stream is rejected
+    pub struct AcceptorTcpTlsStreamRejected<'a> {
+        /// The address of the packet's sender
+        pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
+        /// The local address of the server
+        pub local_address: &'a s2n_quic_core::inet::SocketAddress,
+        /// The amount of time the TCP stream spent on handshaking before being rejected
+        /// since being accepted from the kernel
+        pub sojourn_time: core::time::Duration,
+        /// The error encountered
+        pub error: &'a std::io::Error,
+    }
+    impl<'a> IntoEvent<api::AcceptorTcpTlsStreamRejected<'a>> for AcceptorTcpTlsStreamRejected<'a> {
+        #[inline]
+        fn into_event(self) -> api::AcceptorTcpTlsStreamRejected<'a> {
+            let AcceptorTcpTlsStreamRejected {
+                remote_address,
+                local_address,
+                sojourn_time,
+                error,
+            } = self;
+            api::AcceptorTcpTlsStreamRejected {
+                remote_address: remote_address.into_event(),
+                local_address: local_address.into_event(),
+                sojourn_time: sojourn_time.into_event(),
+                error: error.into_event(),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    /// Emitted when a synthetic TLS stream is rejected.
+    ///
+    /// These are TLS streams detected as coming from a synthetic source (e.g., scanner for endpoint
+    /// compliance). Typically failures here are expected at a much higher rate.
+    pub struct AcceptorTcpSyntheticTlsStreamRejected<'a> {
+        /// The address of the packet's sender
+        pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
+        /// The local address of the server
+        pub local_address: &'a s2n_quic_core::inet::SocketAddress,
+        /// The amount of time the TCP stream spent on handshaking before being rejected
+        /// since being accepted from the kernel
+        pub sojourn_time: core::time::Duration,
+        /// The error encountered
+        pub error: &'a std::io::Error,
+    }
+    impl<'a> IntoEvent<api::AcceptorTcpSyntheticTlsStreamRejected<'a>>
+        for AcceptorTcpSyntheticTlsStreamRejected<'a>
+    {
+        #[inline]
+        fn into_event(self) -> api::AcceptorTcpSyntheticTlsStreamRejected<'a> {
+            let AcceptorTcpSyntheticTlsStreamRejected {
+                remote_address,
+                local_address,
+                sojourn_time,
+                error,
+            } = self;
+            api::AcceptorTcpSyntheticTlsStreamRejected {
+                remote_address: remote_address.into_event(),
+                local_address: local_address.into_event(),
+                sojourn_time: sojourn_time.into_event(),
+                error: error.into_event(),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    /// Emitted when the TCP acceptor received an invalid initial packet
+    pub struct AcceptorTcpPacketDropped<'a> {
+        /// The address of the packet's sender
+        pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
+        /// The reason the packet was dropped
         pub reason: AcceptorPacketDropReason,
-        #[doc = " The amount of time the TCP stream spent in the queue before receiving"]
-        #[doc = " an error"]
+        /// The amount of time the TCP stream spent in the queue before receiving
+        /// an error
         pub sojourn_time: core::time::Duration,
     }
     impl<'a> IntoEvent<api::AcceptorTcpPacketDropped<'a>> for AcceptorTcpPacketDropped<'a> {
@@ -3750,17 +5017,17 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when the TCP stream has been enqueued for the application"]
+    /// Emitted when the TCP stream has been enqueued for the application
     pub struct AcceptorTcpStreamEnqueued<'a> {
-        #[doc = " The address of the stream's peer"]
+        /// The address of the stream's peer
         pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
-        #[doc = " The credential ID of the stream"]
+        /// The credential ID of the stream
         pub credential_id: &'a [u8],
-        #[doc = " The ID of the stream"]
+        /// The ID of the stream
         pub stream_id: u64,
-        #[doc = " The amount of time the TCP stream spent in the queue before being enqueued"]
+        /// The amount of time the TCP stream spent in the queue before being enqueued
         pub sojourn_time: core::time::Duration,
-        #[doc = " The number of times the stream was blocked on receiving more data"]
+        /// The number of times the stream was blocked on receiving more data
         pub blocked_count: usize,
     }
     impl<'a> IntoEvent<api::AcceptorTcpStreamEnqueued<'a>> for AcceptorTcpStreamEnqueued<'a> {
@@ -3783,32 +5050,34 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when the TCP acceptor encounters an IO error"]
+    /// Emitted when the TCP acceptor encounters an IO error
     pub struct AcceptorTcpIoError<'a> {
-        #[doc = " The error encountered"]
+        /// The error encountered
         pub error: &'a std::io::Error,
+        pub source: AcceptorTcpIoErrorSource,
     }
     impl<'a> IntoEvent<api::AcceptorTcpIoError<'a>> for AcceptorTcpIoError<'a> {
         #[inline]
         fn into_event(self) -> api::AcceptorTcpIoError<'a> {
-            let AcceptorTcpIoError { error } = self;
+            let AcceptorTcpIoError { error, source } = self;
             api::AcceptorTcpIoError {
                 error: error.into_event(),
+                source: source.into_event(),
             }
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when the TCP stream has been sent over a Unix domain socket"]
+    /// Emitted when the TCP stream has been sent over a Unix domain socket
     pub struct AcceptorTcpSocketSent<'a> {
-        #[doc = " The credential ID of the stream"]
+        /// The credential ID of the stream
         pub credential_id: &'a [u8],
-        #[doc = " The ID of the stream"]
+        /// The ID of the stream
         pub stream_id: u64,
-        #[doc = " The amount of time the TCP stream spent in the queue before being sent over Unix domain socket"]
+        /// The amount of time the TCP stream spent in the queue before being sent over Unix domain socket
         pub sojourn_time: core::time::Duration,
-        #[doc = " The number of times the Unix domain socket was blocked on send"]
+        /// The number of times the Unix domain socket was blocked on send
         pub blocked_count: usize,
-        #[doc = " The len of the payload sent over the Unix domain socket"]
+        /// The len of the payload sent over the Unix domain socket
         pub payload_len: usize,
     }
     impl<'a> IntoEvent<api::AcceptorTcpSocketSent<'a>> for AcceptorTcpSocketSent<'a> {
@@ -3831,17 +5100,17 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when a TCP stream has been received from a Unix domain socket"]
+    /// Emitted when a TCP stream has been received from a Unix domain socket
     pub struct AcceptorTcpSocketReceived<'a> {
-        #[doc = " The address of the stream's peer"]
+        /// The address of the stream's peer
         pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
-        #[doc = " The credential ID of the stream"]
+        /// The credential ID of the stream
         pub credential_id: &'a [u8],
-        #[doc = " The ID of the stream"]
+        /// The ID of the stream
         pub stream_id: u64,
-        #[doc = " The amount of time taken from socket send to socket receive, including waiting if the kernel queue is full"]
+        /// The amount of time taken from socket send to socket receive, including waiting if the kernel queue is full
         pub transfer_time: core::time::Duration,
-        #[doc = " The len of the payload sent over the Unix domain socket"]
+        /// The len of the payload sent over the Unix domain socket
         pub payload_len: usize,
     }
     impl<'a> IntoEvent<api::AcceptorTcpSocketReceived<'a>> for AcceptorTcpSocketReceived<'a> {
@@ -3864,11 +5133,11 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when a UDP acceptor is started"]
+    /// Emitted when a UDP acceptor is started
     pub struct AcceptorUdpStarted<'a> {
-        #[doc = " The id of the acceptor worker"]
+        /// The id of the acceptor worker
         pub id: usize,
-        #[doc = " The local address of the acceptor"]
+        /// The local address of the acceptor
         pub local_address: SocketAddress<'a>,
     }
     impl<'a> IntoEvent<api::AcceptorUdpStarted<'a>> for AcceptorUdpStarted<'a> {
@@ -3882,11 +5151,11 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when a UDP datagram is received by the acceptor"]
+    /// Emitted when a UDP datagram is received by the acceptor
     pub struct AcceptorUdpDatagramReceived<'a> {
-        #[doc = " The address of the datagram's sender"]
+        /// The address of the datagram's sender
         pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
-        #[doc = " The len of the datagram"]
+        /// The len of the datagram
         pub len: usize,
     }
     impl<'a> IntoEvent<api::AcceptorUdpDatagramReceived<'a>> for AcceptorUdpDatagramReceived<'a> {
@@ -3903,23 +5172,23 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when the UDP acceptor parsed a packet contained in a datagram"]
+    /// Emitted when the UDP acceptor parsed a packet contained in a datagram
     pub struct AcceptorUdpPacketReceived<'a> {
-        #[doc = " The address of the packet's sender"]
+        /// The address of the packet's sender
         pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
-        #[doc = " The credential ID of the packet"]
+        /// The credential ID of the packet
         pub credential_id: &'a [u8],
-        #[doc = " The stream ID of the packet"]
+        /// The stream ID of the packet
         pub stream_id: u64,
-        #[doc = " The payload length of the packet"]
+        /// The payload length of the packet
         pub payload_len: usize,
-        #[doc = " If the packets is a zero offset in the stream"]
+        /// If the packets is a zero offset in the stream
         pub is_zero_offset: bool,
-        #[doc = " If the packet is a retransmission"]
+        /// If the packet is a retransmission
         pub is_retransmission: bool,
-        #[doc = " If the packet includes the final bytes of the stream"]
+        /// If the packet includes the final bytes of the stream
         pub is_fin: bool,
-        #[doc = " If the packet includes the final offset of the stream"]
+        /// If the packet includes the final offset of the stream
         pub is_fin_known: bool,
     }
     impl<'a> IntoEvent<api::AcceptorUdpPacketReceived<'a>> for AcceptorUdpPacketReceived<'a> {
@@ -3948,11 +5217,11 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when the UDP acceptor received an invalid initial packet"]
+    /// Emitted when the UDP acceptor received an invalid initial packet
     pub struct AcceptorUdpPacketDropped<'a> {
-        #[doc = " The address of the packet's sender"]
+        /// The address of the packet's sender
         pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
-        #[doc = " The reason the packet was dropped"]
+        /// The reason the packet was dropped
         pub reason: AcceptorPacketDropReason,
     }
     impl<'a> IntoEvent<api::AcceptorUdpPacketDropped<'a>> for AcceptorUdpPacketDropped<'a> {
@@ -3969,13 +5238,13 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when the UDP stream has been enqueued for the application"]
+    /// Emitted when the UDP stream has been enqueued for the application
     pub struct AcceptorUdpStreamEnqueued<'a> {
-        #[doc = " The address of the stream's peer"]
+        /// The address of the stream's peer
         pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
-        #[doc = " The credential ID of the stream"]
+        /// The credential ID of the stream
         pub credential_id: &'a [u8],
-        #[doc = " The ID of the stream"]
+        /// The ID of the stream
         pub stream_id: u64,
     }
     impl<'a> IntoEvent<api::AcceptorUdpStreamEnqueued<'a>> for AcceptorUdpStreamEnqueued<'a> {
@@ -3994,9 +5263,9 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when the UDP acceptor encounters an IO error"]
+    /// Emitted when the UDP acceptor encounters an IO error
     pub struct AcceptorUdpIoError<'a> {
-        #[doc = " The error encountered"]
+        /// The error encountered
         pub error: &'a std::io::Error,
     }
     impl<'a> IntoEvent<api::AcceptorUdpIoError<'a>> for AcceptorUdpIoError<'a> {
@@ -4009,16 +5278,16 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when a stream has been pruned"]
+    /// Emitted when a stream has been pruned
     pub struct AcceptorStreamPruned<'a> {
-        #[doc = " The remote address of the stream"]
+        /// The remote address of the stream
         pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
-        #[doc = " The credential ID of the stream"]
+        /// The credential ID of the stream
         pub credential_id: &'a [u8],
-        #[doc = " The ID of the stream"]
+        /// The ID of the stream
         pub stream_id: u64,
-        #[doc = " The amount of time that the stream spent in the accept queue before"]
-        #[doc = " being pruned"]
+        /// The amount of time that the stream spent in the accept queue before
+        /// being pruned
         pub sojourn_time: core::time::Duration,
         pub reason: AcceptorStreamPruneReason,
     }
@@ -4042,17 +5311,19 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when a stream has been dequeued by the application"]
+    /// Emitted when a stream has been dequeued by the application
     pub struct AcceptorStreamDequeued<'a> {
-        #[doc = " The remote address of the stream"]
+        /// The remote address of the stream
         pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
-        #[doc = " The credential ID of the stream"]
+        /// The credential ID of the stream
         pub credential_id: &'a [u8],
-        #[doc = " The ID of the stream"]
+        /// The ID of the stream
         pub stream_id: u64,
-        #[doc = " The amount of time that the stream spent in the accept queue before"]
-        #[doc = " being dequeued"]
+        /// The amount of time that the stream spent in dcQUIC before being dequeued
         pub sojourn_time: core::time::Duration,
+        /// The amount of time that the stream spent in the queue to the application before being
+        /// dequeued
+        pub queue_sojourn_time: core::time::Duration,
     }
     impl<'a> IntoEvent<api::AcceptorStreamDequeued<'a>> for AcceptorStreamDequeued<'a> {
         #[inline]
@@ -4062,20 +5333,22 @@ pub mod builder {
                 credential_id,
                 stream_id,
                 sojourn_time,
+                queue_sojourn_time,
             } = self;
             api::AcceptorStreamDequeued {
                 remote_address: remote_address.into_event(),
                 credential_id: credential_id.into_event(),
                 stream_id: stream_id.into_event(),
                 sojourn_time: sojourn_time.into_event(),
+                queue_sojourn_time: queue_sojourn_time.into_event(),
             }
         }
     }
     #[derive(Clone, Debug)]
     pub enum AcceptorTcpStreamDropReason {
-        #[doc = " There were more streams in the TCP backlog than the userspace queue can store"]
+        /// There were more streams in the TCP backlog than the userspace queue can store
         FreshQueueAtCapacity,
-        #[doc = " There are no available slots for processing"]
+        /// There are no available slots for processing
         SlotsAtCapacity,
     }
     impl IntoEvent<api::AcceptorTcpStreamDropReason> for AcceptorTcpStreamDropReason {
@@ -4085,6 +5358,43 @@ pub mod builder {
             match self {
                 Self::FreshQueueAtCapacity => FreshQueueAtCapacity {},
                 Self::SlotsAtCapacity => SlotsAtCapacity {},
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    pub enum AcceptorTcpIoErrorSource {
+        /// Problem during accept of the TCP socket
+        Accept,
+        /// Problem writing to the TCP socket
+        Send,
+        /// Kernel originating from sending the TCP socket over UDS
+        UnixSend,
+        /// Problem reading from the TCP socket
+        Recv,
+        /// Something within dcQUIC failed related to the remote state or network contents (e.g.,
+        /// parsing the packet)
+        Remote,
+        /// Something in the local application state was wrong.
+        Local,
+        /// Unknown path secret for remote stream.
+        UnknownPathSecret,
+        /// Something went wrong that we didn't expect to happen.
+        /// This is used for failures that aren't expected to relate to dcQUIC state at all.
+        System,
+    }
+    impl IntoEvent<api::AcceptorTcpIoErrorSource> for AcceptorTcpIoErrorSource {
+        #[inline]
+        fn into_event(self) -> api::AcceptorTcpIoErrorSource {
+            use api::AcceptorTcpIoErrorSource::*;
+            match self {
+                Self::Accept => Accept {},
+                Self::Send => Send {},
+                Self::UnixSend => UnixSend {},
+                Self::Recv => Recv {},
+                Self::Remote => Remote {},
+                Self::Local => Local {},
+                Self::UnknownPathSecret => UnknownPathSecret {},
+                Self::System => System {},
             }
         }
     }
@@ -4163,13 +5473,13 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamWriteFlushed {
-        #[doc = " The number of bytes that the application tried to write"]
+        /// The number of bytes that the application tried to write
         pub provided_len: usize,
-        #[doc = " The amount that was written"]
+        /// The amount that was written
         pub committed_len: usize,
-        #[doc = " The amount of time it took to process the write request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and encryption overhead"]
+        /// The amount of time it took to process the write request
+        ///
+        /// Note that this includes both any syscall and encryption overhead
         pub processing_duration: core::time::Duration,
     }
     impl IntoEvent<api::StreamWriteFlushed> for StreamWriteFlushed {
@@ -4189,13 +5499,13 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamWriteFinFlushed {
-        #[doc = " The number of bytes that the application tried to write"]
+        /// The number of bytes that the application tried to write
         pub provided_len: usize,
-        #[doc = " The amount that was written"]
+        /// The amount that was written
         pub committed_len: usize,
-        #[doc = " The amount of time it took to process the write request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and encryption overhead"]
+        /// The amount of time it took to process the write request
+        ///
+        /// Note that this includes both any syscall and encryption overhead
         pub processing_duration: core::time::Duration,
     }
     impl IntoEvent<api::StreamWriteFinFlushed> for StreamWriteFinFlushed {
@@ -4215,13 +5525,13 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamWriteBlocked {
-        #[doc = " The number of bytes that the application tried to write"]
+        /// The number of bytes that the application tried to write
         pub provided_len: usize,
-        #[doc = " Indicates that the write was the final offset of the stream"]
+        /// Indicates that the write was the final offset of the stream
         pub is_fin: bool,
-        #[doc = " The amount of time it took to process the write request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and encryption overhead"]
+        /// The amount of time it took to process the write request
+        ///
+        /// Note that this includes both any syscall and encryption overhead
         pub processing_duration: core::time::Duration,
     }
     impl IntoEvent<api::StreamWriteBlocked> for StreamWriteBlocked {
@@ -4241,15 +5551,15 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamWriteErrored {
-        #[doc = " The number of bytes that the application tried to write"]
+        /// The number of bytes that the application tried to write
         pub provided_len: usize,
-        #[doc = " Indicates that the write was the final offset of the stream"]
+        /// Indicates that the write was the final offset of the stream
         pub is_fin: bool,
-        #[doc = " The amount of time it took to process the write request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and encryption overhead"]
+        /// The amount of time it took to process the write request
+        ///
+        /// Note that this includes both any syscall and encryption overhead
         pub processing_duration: core::time::Duration,
-        #[doc = " The system `errno` from the returned error"]
+        /// The system `errno` from the returned error
         pub errno: Option<i32>,
     }
     impl IntoEvent<api::StreamWriteErrored> for StreamWriteErrored {
@@ -4284,7 +5594,7 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamWriteAllocated {
-        #[doc = " The number of bytes that we allocated."]
+        /// The number of bytes that we allocated.
         pub allocated_len: usize,
     }
     impl IntoEvent<api::StreamWriteAllocated> for StreamWriteAllocated {
@@ -4298,9 +5608,9 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamWriteShutdown {
-        #[doc = " The number of bytes in the send buffer at the time of shutdown"]
+        /// The number of bytes in the send buffer at the time of shutdown
         pub buffer_len: usize,
-        #[doc = " If the stream required a background task to drive the stream shutdown"]
+        /// If the stream required a background task to drive the stream shutdown
         pub background: bool,
     }
     impl IntoEvent<api::StreamWriteShutdown> for StreamWriteShutdown {
@@ -4318,9 +5628,9 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamWriteSocketFlushed {
-        #[doc = " The number of bytes that the stream tried to write to the socket"]
+        /// The number of bytes that the stream tried to write to the socket
         pub provided_len: usize,
-        #[doc = " The amount that was written"]
+        /// The amount that was written
         pub committed_len: usize,
     }
     impl IntoEvent<api::StreamWriteSocketFlushed> for StreamWriteSocketFlushed {
@@ -4338,7 +5648,7 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamWriteSocketBlocked {
-        #[doc = " The number of bytes that the stream tried to write to the socket"]
+        /// The number of bytes that the stream tried to write to the socket
         pub provided_len: usize,
     }
     impl IntoEvent<api::StreamWriteSocketBlocked> for StreamWriteSocketBlocked {
@@ -4352,9 +5662,9 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamWriteSocketErrored {
-        #[doc = " The number of bytes that the stream tried to write to the socket"]
+        /// The number of bytes that the stream tried to write to the socket
         pub provided_len: usize,
-        #[doc = " The system `errno` from the returned error"]
+        /// The system `errno` from the returned error
         pub errno: Option<i32>,
     }
     impl IntoEvent<api::StreamWriteSocketErrored> for StreamWriteSocketErrored {
@@ -4372,13 +5682,13 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamReadFlushed {
-        #[doc = " The number of bytes that the application tried to read"]
+        /// The number of bytes that the application tried to read
         pub capacity: usize,
-        #[doc = " The amount that was read into the provided buffer"]
+        /// The amount that was read into the provided buffer
         pub committed_len: usize,
-        #[doc = " The amount of time it took to process the read request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and decryption overhead"]
+        /// The amount of time it took to process the read request
+        ///
+        /// Note that this includes both any syscall and decryption overhead
         pub processing_duration: core::time::Duration,
     }
     impl IntoEvent<api::StreamReadFlushed> for StreamReadFlushed {
@@ -4398,11 +5708,11 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamReadFinFlushed {
-        #[doc = " The number of bytes that the application tried to read"]
+        /// The number of bytes that the application tried to read
         pub capacity: usize,
-        #[doc = " The amount of time it took to process the read request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and decryption overhead"]
+        /// The amount of time it took to process the read request
+        ///
+        /// Note that this includes both any syscall and decryption overhead
         pub processing_duration: core::time::Duration,
     }
     impl IntoEvent<api::StreamReadFinFlushed> for StreamReadFinFlushed {
@@ -4420,11 +5730,11 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamReadBlocked {
-        #[doc = " The number of bytes that the application tried to read"]
+        /// The number of bytes that the application tried to read
         pub capacity: usize,
-        #[doc = " The amount of time it took to process the read request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and decryption overhead"]
+        /// The amount of time it took to process the read request
+        ///
+        /// Note that this includes both any syscall and decryption overhead
         pub processing_duration: core::time::Duration,
     }
     impl IntoEvent<api::StreamReadBlocked> for StreamReadBlocked {
@@ -4442,13 +5752,13 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamReadErrored {
-        #[doc = " The number of bytes that the application tried to read"]
+        /// The number of bytes that the application tried to read
         pub capacity: usize,
-        #[doc = " The amount of time it took to process the read request"]
-        #[doc = ""]
-        #[doc = " Note that this includes both any syscall and decryption overhead"]
+        /// The amount of time it took to process the read request
+        ///
+        /// Note that this includes both any syscall and decryption overhead
         pub processing_duration: core::time::Duration,
-        #[doc = " The system `errno` from the returned error"]
+        /// The system `errno` from the returned error
         pub errno: Option<i32>,
     }
     impl IntoEvent<api::StreamReadErrored> for StreamReadErrored {
@@ -4481,7 +5791,7 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamReadShutdown {
-        #[doc = " If the stream required a background task to drive the stream shutdown"]
+        /// If the stream required a background task to drive the stream shutdown
         pub background: bool,
     }
     impl IntoEvent<api::StreamReadShutdown> for StreamReadShutdown {
@@ -4495,9 +5805,9 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamReadSocketFlushed {
-        #[doc = " The number of bytes that the stream tried to read from the socket"]
+        /// The number of bytes that the stream tried to read from the socket
         pub capacity: usize,
-        #[doc = " The amount that was read into the provided buffer"]
+        /// The amount that was read into the provided buffer
         pub committed_len: usize,
     }
     impl IntoEvent<api::StreamReadSocketFlushed> for StreamReadSocketFlushed {
@@ -4515,7 +5825,7 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamReadSocketBlocked {
-        #[doc = " The number of bytes that the stream tried to read from the socket"]
+        /// The number of bytes that the stream tried to read from the socket
         pub capacity: usize,
     }
     impl IntoEvent<api::StreamReadSocketBlocked> for StreamReadSocketBlocked {
@@ -4529,9 +5839,9 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamReadSocketErrored {
-        #[doc = " The number of bytes that the stream tried to read from the socket"]
+        /// The number of bytes that the stream tried to read from the socket
         pub capacity: usize,
-        #[doc = " The system `errno` from the returned error"]
+        /// The system `errno` from the returned error
         pub errno: Option<i32>,
     }
     impl IntoEvent<api::StreamReadSocketErrored> for StreamReadSocketErrored {
@@ -4546,16 +5856,16 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamDecryptPacket {
-        #[doc = " Did we decrypt the packet in place, or were we able to merge the copy and decrypt?"]
+        /// Did we decrypt the packet in place, or were we able to merge the copy and decrypt?
         pub decrypted_in_place: bool,
-        #[doc = " The number of bytes we were forced to copy after decrypting in the packet buffer."]
-        #[doc = ""]
-        #[doc = " This means that the application buffer was insufficiently large to allow us to directly"]
-        #[doc = " copy as part of the decrypt. This can be non-zero even with decrypted_in_place=false, if we"]
-        #[doc = " decrypted into the reassembly buffer. Right now it doesn't take into account zero-copy"]
-        #[doc = " reads from the reassembly buffer (e.g., with specialized Bytes)."]
+        /// The number of bytes we were forced to copy after decrypting in the packet buffer.
+        ///
+        /// This means that the application buffer was insufficiently large to allow us to directly
+        /// copy as part of the decrypt. This can be non-zero even with decrypted_in_place=false, if we
+        /// decrypted into the reassembly buffer. Right now it doesn't take into account zero-copy
+        /// reads from the reassembly buffer (e.g., with specialized Bytes).
         pub forced_copy: usize,
-        #[doc = " The application buffer size that would avoid copies."]
+        /// The application buffer size that would avoid copies.
         pub required_application_buffer: usize,
     }
     impl IntoEvent<api::StreamDecryptPacket> for StreamDecryptPacket {
@@ -4574,7 +5884,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Tracks stream connect where dcQUIC owns the TCP connect()."]
+    /// Tracks stream connect where dcQUIC owns the TCP connect().
     pub struct StreamTcpConnect {
         pub error: bool,
         pub latency: core::time::Duration,
@@ -4590,7 +5900,54 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Tracks stream connect where dcQUIC owns the TCP connect()."]
+    /// Tracks TLS stream establishment.
+    pub struct StreamTlsConnect<'a> {
+        pub error: bool,
+        /// The remote address being connected to
+        pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
+        pub tcp_latency: core::time::Duration,
+        pub tls_latency: core::time::Duration,
+    }
+    impl<'a> IntoEvent<api::StreamTlsConnect<'a>> for StreamTlsConnect<'a> {
+        #[inline]
+        fn into_event(self) -> api::StreamTlsConnect<'a> {
+            let StreamTlsConnect {
+                error,
+                remote_address,
+                tcp_latency,
+                tls_latency,
+            } = self;
+            api::StreamTlsConnect {
+                error: error.into_event(),
+                remote_address: remote_address.into_event(),
+                tcp_latency: tcp_latency.into_event(),
+                tls_latency: tls_latency.into_event(),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    /// Emitted when a TLS stream connect fails.
+    pub struct StreamTlsConnectError<'a> {
+        /// The remote address being connected to
+        pub remote_address: &'a s2n_quic_core::inet::SocketAddress,
+        /// The error encountered
+        pub error: &'a std::io::Error,
+    }
+    impl<'a> IntoEvent<api::StreamTlsConnectError<'a>> for StreamTlsConnectError<'a> {
+        #[inline]
+        fn into_event(self) -> api::StreamTlsConnectError<'a> {
+            let StreamTlsConnectError {
+                remote_address,
+                error,
+            } = self;
+            api::StreamTlsConnectError {
+                remote_address: remote_address.into_event(),
+                error: error.into_event(),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    /// Tracks stream connect where dcQUIC owns the TCP connect().
     pub struct StreamConnect {
         pub error: bool,
         pub tcp_success: MaybeBoolCounter,
@@ -4612,32 +5969,34 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Tracks stream connect errors."]
-    #[doc = ""]
-    #[doc = " Currently only emitted in cases where dcQUIC owns the TCP connect too."]
+    /// Tracks stream connect errors.
+    ///
+    /// Currently only emitted in cases where dcQUIC owns the TCP connect too.
     pub struct StreamConnectError {
         pub reason: StreamTcpConnectErrorReason,
+        pub latency: core::time::Duration,
     }
     impl IntoEvent<api::StreamConnectError> for StreamConnectError {
         #[inline]
         fn into_event(self) -> api::StreamConnectError {
-            let StreamConnectError { reason } = self;
+            let StreamConnectError { reason, latency } = self;
             api::StreamConnectError {
                 reason: reason.into_event(),
+                latency: latency.into_event(),
             }
         }
     }
     #[derive(Clone, Debug)]
     pub struct StreamPacketTransmitted {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The size of the application data in the packet"]
+        /// The size of the application data in the packet
         pub payload_len: usize,
-        #[doc = " The packet number of the transmitted packet"]
+        /// The packet number of the transmitted packet
         pub packet_number: u64,
-        #[doc = " The offset in the stream of the first byte in the packet"]
+        /// The offset in the stream of the first byte in the packet
         pub stream_offset: u64,
-        #[doc = " Whether the packet contained the final bytes of the stream"]
+        /// Whether the packet contained the final bytes of the stream
         pub is_fin: bool,
         pub is_retransmission: bool,
     }
@@ -4664,9 +6023,9 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamProbeTransmitted {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The packet number of the transmitted packet"]
+        /// The packet number of the transmitted packet
         pub packet_number: u64,
     }
     impl IntoEvent<api::StreamProbeTransmitted> for StreamProbeTransmitted {
@@ -4684,15 +6043,15 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamPacketReceived {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The size of the application data in the packet"]
+        /// The size of the application data in the packet
         pub payload_len: usize,
-        #[doc = " The packet number of the received packet"]
+        /// The packet number of the received packet
         pub packet_number: u64,
-        #[doc = " The offset in the stream of the first byte in the packet"]
+        /// The offset in the stream of the first byte in the packet
         pub stream_offset: u64,
-        #[doc = " Whether the packet contained the final bytes of the stream"]
+        /// Whether the packet contained the final bytes of the stream
         pub is_fin: bool,
         pub is_retransmission: bool,
     }
@@ -4718,19 +6077,19 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Indicates that a packet was lost on a stream"]
+    /// Indicates that a packet was lost on a stream
     pub struct StreamPacketLost {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The size of the application data in the packet"]
+        /// The size of the application data in the packet
         pub payload_len: usize,
-        #[doc = " The packet number of the lost packet"]
+        /// The packet number of the lost packet
         pub packet_number: u64,
-        #[doc = " The offset in the stream of the first byte in the packet"]
+        /// The offset in the stream of the first byte in the packet
         pub stream_offset: u64,
-        #[doc = " The time the packet was originally sent"]
+        /// The time the packet was originally sent
         pub time_sent: Timestamp,
-        #[doc = " The amount of time between when the packet was sent and when it was detected as lost"]
+        /// The amount of time between when the packet was sent and when it was detected as lost
         pub lifetime: core::time::Duration,
         pub is_retransmission: bool,
     }
@@ -4758,19 +6117,19 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Indicates that a packet was acknowledged on a stream"]
+    /// Indicates that a packet was acknowledged on a stream
     pub struct StreamPacketAcked {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The size of the application data in the packet"]
+        /// The size of the application data in the packet
         pub payload_len: usize,
-        #[doc = " The packet number of the acknowledged packet"]
+        /// The packet number of the acknowledged packet
         pub packet_number: u64,
-        #[doc = " The offset in the stream of the first byte in the packet"]
+        /// The offset in the stream of the first byte in the packet
         pub stream_offset: u64,
-        #[doc = " The time the packet was originally sent"]
+        /// The time the packet was originally sent
         pub time_sent: Timestamp,
-        #[doc = " The amount of time between when the packet was sent and when it was detected as lost"]
+        /// The amount of time between when the packet was sent and when it was detected as lost
         pub lifetime: core::time::Duration,
         pub is_retransmission: bool,
     }
@@ -4798,17 +6157,17 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Indicates that a packet was retransmitted on a stream but was not actually lost"]
+    /// Indicates that a packet was retransmitted on a stream but was not actually lost
     pub struct StreamPacketSpuriouslyRetransmitted {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The size of the application data in the packet"]
+        /// The size of the application data in the packet
         pub payload_len: usize,
-        #[doc = " The packet number of the packet"]
+        /// The packet number of the packet
         pub packet_number: u64,
-        #[doc = " The offset in the stream of the first byte in the packet"]
+        /// The offset in the stream of the first byte in the packet
         pub stream_offset: u64,
-        #[doc = " Whether the packet contained the final bytes of the stream"]
+        /// Whether the packet contained the final bytes of the stream
         pub is_fin: bool,
         pub is_retransmission: bool,
     }
@@ -4834,11 +6193,11 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Indicates that the stream received additional flow control credits"]
+    /// Indicates that the stream received additional flow control credits
     pub struct StreamMaxDataReceived {
-        #[doc = " The number of bytes of flow control credits received"]
+        /// The number of bytes of flow control credits received
         pub increase: u64,
-        #[doc = " The new offset of the stream"]
+        /// The new offset of the stream
         pub new_max_data: u64,
     }
     impl IntoEvent<api::StreamMaxDataReceived> for StreamMaxDataReceived {
@@ -4856,11 +6215,11 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamControlPacketTransmitted {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The size of the control data in the packet"]
+        /// The size of the control data in the packet
         pub control_data_len: usize,
-        #[doc = " The packet number of the received control packet"]
+        /// The packet number of the received control packet
         pub packet_number: u64,
     }
     impl IntoEvent<api::StreamControlPacketTransmitted> for StreamControlPacketTransmitted {
@@ -4880,13 +6239,13 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct StreamControlPacketReceived {
-        #[doc = " The total size of the packet"]
+        /// The total size of the packet
         pub packet_len: usize,
-        #[doc = " The size of the control data in the packet"]
+        /// The size of the control data in the packet
         pub control_data_len: usize,
-        #[doc = " The packet number of the received control packet"]
+        /// The packet number of the received control packet
         pub packet_number: u64,
-        #[doc = " Whether the packet was successfully authenticated"]
+        /// Whether the packet was successfully authenticated
         pub is_authenticated: bool,
     }
     impl IntoEvent<api::StreamControlPacketReceived> for StreamControlPacketReceived {
@@ -4909,7 +6268,7 @@ pub mod builder {
     #[derive(Clone, Debug)]
     pub struct StreamReceiverErrored {
         pub error: crate::stream::recv::Error,
-        #[doc = " The location where the error originated"]
+        /// The location where the error originated
         pub source: s2n_quic_core::endpoint::Location,
     }
     impl IntoEvent<api::StreamReceiverErrored> for StreamReceiverErrored {
@@ -4925,7 +6284,7 @@ pub mod builder {
     #[derive(Clone, Debug)]
     pub struct StreamSenderErrored {
         pub error: crate::stream::send::Error,
-        #[doc = " The location where the error originated"]
+        /// The location where the error originated
         pub source: s2n_quic_core::endpoint::Location,
     }
     impl IntoEvent<api::StreamSenderErrored> for StreamSenderErrored {
@@ -4939,6 +6298,20 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
+    /// Emitted when a handshake packet is rejected due to an invalid field value
+    pub struct StreamHandshakePacketRejected {
+        pub reason: StreamHandshakePacketRejectedReason,
+    }
+    impl IntoEvent<api::StreamHandshakePacketRejected> for StreamHandshakePacketRejected {
+        #[inline]
+        fn into_event(self) -> api::StreamHandshakePacketRejected {
+            let StreamHandshakePacketRejected { reason } = self;
+            api::StreamHandshakePacketRejected {
+                reason: reason.into_event(),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
     pub struct ConnectionClosed {}
     impl IntoEvent<api::ConnectionClosed> for ConnectionClosed {
         #[inline]
@@ -4948,8 +6321,8 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Used for cases where we are racing multiple futures and exit if any of them fail, and so"]
-    #[doc = " recording success is not just a boolean value."]
+    /// Used for cases where we are racing multiple futures and exit if any of them fail, and so
+    /// recording success is not just a boolean value.
     pub enum MaybeBoolCounter {
         Success,
         Failure,
@@ -4967,17 +6340,28 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Note that there's no guarantee of a particular reason if multiple reasons ~simultaneously"]
-    #[doc = " terminate the connection."]
+    /// Note that there's no guarantee of a particular reason if multiple reasons ~simultaneously
+    /// terminate the connection.
     pub enum StreamTcpConnectErrorReason {
-        #[doc = " TCP connect failed."]
+        /// TCP connect failed.
         TcpConnect,
-        #[doc = " Handshake failed to produce credentials."]
+        /// Handshake failed to produce credentials.
         Handshake,
-        #[doc = " When the connect future is dropped prior to returning any result."]
-        #[doc = ""]
-        #[doc = " Usually indicates a timeout in the application."]
-        Aborted,
+        /// Emitted when no psk was cached for the peer.
+        PeerPskMissing,
+        /// When the connect future is dropped prior to returning any result.
+        ///
+        /// This means the TCP connect succeeded, but the handshake hasn't yet by the time the connect
+        /// future was dropped.
+        AbortedPendingHandshake,
+        /// When the connect future is dropped prior to returning any result.
+        ///
+        /// The handshake succeeded (or wasn't needed), but the TCP connect hasn't yet finished.
+        AbortedPendingConnect,
+        /// When the connect future is dropped prior to returning any result.
+        ///
+        /// Neither the TCP connect or handshake have finished yet.
+        AbortedPendingBoth,
     }
     impl IntoEvent<api::StreamTcpConnectErrorReason> for StreamTcpConnectErrorReason {
         #[inline]
@@ -4986,7 +6370,24 @@ pub mod builder {
             match self {
                 Self::TcpConnect => TcpConnect {},
                 Self::Handshake => Handshake {},
-                Self::Aborted => Aborted {},
+                Self::PeerPskMissing => PeerPskMissing {},
+                Self::AbortedPendingHandshake => AbortedPendingHandshake {},
+                Self::AbortedPendingConnect => AbortedPendingConnect {},
+                Self::AbortedPendingBoth => AbortedPendingBoth {},
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    pub enum StreamHandshakePacketRejectedReason {
+        /// The queue_id exceeds the maximum encodable value
+        InvalidQueueId,
+    }
+    impl IntoEvent<api::StreamHandshakePacketRejectedReason> for StreamHandshakePacketRejectedReason {
+        #[inline]
+        fn into_event(self) -> api::StreamHandshakePacketRejectedReason {
+            use api::StreamHandshakePacketRejectedReason::*;
+            match self {
+                Self::InvalidQueueId => InvalidQueueId {},
             }
         }
     }
@@ -5015,8 +6416,22 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
+    /// Emitted when the DC handshake confirmation or MTU probing times out
+    pub struct DcConnectionTimeout<'a> {
+        pub peer_address: SocketAddress<'a>,
+    }
+    impl<'a> IntoEvent<api::DcConnectionTimeout<'a>> for DcConnectionTimeout<'a> {
+        #[inline]
+        fn into_event(self) -> api::DcConnectionTimeout<'a> {
+            let DcConnectionTimeout { peer_address } = self;
+            api::DcConnectionTimeout {
+                peer_address: peer_address.into_event(),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
     pub struct PathSecretMapInitialized {
-        #[doc = " The capacity of the path secret map"]
+        /// The capacity of the path secret map
         pub capacity: usize,
     }
     impl IntoEvent<api::PathSecretMapInitialized> for PathSecretMapInitialized {
@@ -5030,9 +6445,9 @@ pub mod builder {
     }
     #[derive(Clone, Debug)]
     pub struct PathSecretMapUninitialized {
-        #[doc = " The capacity of the path secret map"]
+        /// The capacity of the path secret map
         pub capacity: usize,
-        #[doc = " The number of entries in the map"]
+        /// The number of entries in the map
         pub entries: usize,
         pub lifetime: core::time::Duration,
     }
@@ -5052,7 +6467,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when a background handshake is requested"]
+    /// Emitted when a background handshake is requested
     pub struct PathSecretMapBackgroundHandshakeRequested<'a> {
         pub peer_address: SocketAddress<'a>,
     }
@@ -5068,7 +6483,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when the entry is inserted into the path secret map"]
+    /// Emitted when the entry is inserted into the path secret map
     pub struct PathSecretMapEntryInserted<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5087,7 +6502,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when the entry is considered ready for use"]
+    /// Emitted when the entry is considered ready for use
     pub struct PathSecretMapEntryReady<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5106,11 +6521,13 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an entry is replaced by a new one for the same `peer_address`"]
+    /// Emitted when an entry is replaced by a new one for the same `peer_address`
     pub struct PathSecretMapEntryReplaced<'a> {
         pub peer_address: SocketAddress<'a>,
         pub new_credential_id: &'a [u8],
         pub previous_credential_id: &'a [u8],
+        /// Time since insertion of the replaced entry
+        pub replaced_age: core::time::Duration,
     }
     impl<'a> IntoEvent<api::PathSecretMapEntryReplaced<'a>> for PathSecretMapEntryReplaced<'a> {
         #[inline]
@@ -5119,21 +6536,25 @@ pub mod builder {
                 peer_address,
                 new_credential_id,
                 previous_credential_id,
+                replaced_age,
             } = self;
             api::PathSecretMapEntryReplaced {
                 peer_address: peer_address.into_event(),
                 new_credential_id: new_credential_id.into_event(),
                 previous_credential_id: previous_credential_id.into_event(),
+                replaced_age: replaced_age.into_event(),
             }
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an entry is evicted due to running out of space"]
+    /// Emitted when an entry is evicted due to running out of space
     pub struct PathSecretMapIdEntryEvicted<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
-        #[doc = " Time since insertion of this entry"]
+        /// Time since insertion of this entry
         pub age: core::time::Duration,
+        pub time_since_last_accessed: core::time::Duration,
+        pub reason: EvictionReason,
     }
     impl<'a> IntoEvent<api::PathSecretMapIdEntryEvicted<'a>> for PathSecretMapIdEntryEvicted<'a> {
         #[inline]
@@ -5142,21 +6563,27 @@ pub mod builder {
                 peer_address,
                 credential_id,
                 age,
+                time_since_last_accessed,
+                reason,
             } = self;
             api::PathSecretMapIdEntryEvicted {
                 peer_address: peer_address.into_event(),
                 credential_id: credential_id.into_event(),
                 age: age.into_event(),
+                time_since_last_accessed: time_since_last_accessed.into_event(),
+                reason: reason.into_event(),
             }
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an entry is evicted due to running out of space"]
+    /// Emitted when an entry is evicted due to running out of space
     pub struct PathSecretMapAddressEntryEvicted<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
-        #[doc = " Time since insertion of this entry"]
+        /// Time since insertion of this entry
         pub age: core::time::Duration,
+        pub time_since_last_accessed: core::time::Duration,
+        pub reason: EvictionReason,
     }
     impl<'a> IntoEvent<api::PathSecretMapAddressEntryEvicted<'a>>
         for PathSecretMapAddressEntryEvicted<'a>
@@ -5167,16 +6594,20 @@ pub mod builder {
                 peer_address,
                 credential_id,
                 age,
+                time_since_last_accessed,
+                reason,
             } = self;
             api::PathSecretMapAddressEntryEvicted {
                 peer_address: peer_address.into_event(),
                 credential_id: credential_id.into_event(),
                 age: age.into_event(),
+                time_since_last_accessed: time_since_last_accessed.into_event(),
+                reason: reason.into_event(),
             }
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an UnknownPathSecret packet was sent"]
+    /// Emitted when an UnknownPathSecret packet was sent
     pub struct UnknownPathSecretPacketSent<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5195,7 +6626,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an UnknownPathSecret packet was received"]
+    /// Emitted when an UnknownPathSecret packet was received
     pub struct UnknownPathSecretPacketReceived<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5216,10 +6647,14 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an UnknownPathSecret packet was authentic and processed"]
+    /// Emitted when an UnknownPathSecret packet was authentic and processed
     pub struct UnknownPathSecretPacketAccepted<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
+        /// The age of the entry the peer indicated it doesn't know about.
+        pub age: core::time::Duration,
+        pub evicted: bool,
+        pub scheduled_handshake: bool,
     }
     impl<'a> IntoEvent<api::UnknownPathSecretPacketAccepted<'a>>
         for UnknownPathSecretPacketAccepted<'a>
@@ -5229,15 +6664,21 @@ pub mod builder {
             let UnknownPathSecretPacketAccepted {
                 peer_address,
                 credential_id,
+                age,
+                evicted,
+                scheduled_handshake,
             } = self;
             api::UnknownPathSecretPacketAccepted {
                 peer_address: peer_address.into_event(),
                 credential_id: credential_id.into_event(),
+                age: age.into_event(),
+                evicted: evicted.into_event(),
+                scheduled_handshake: scheduled_handshake.into_event(),
             }
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an UnknownPathSecret packet was rejected as invalid"]
+    /// Emitted when an UnknownPathSecret packet was rejected as invalid
     pub struct UnknownPathSecretPacketRejected<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5258,7 +6699,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an UnknownPathSecret packet was dropped due to a missing entry"]
+    /// Emitted when an UnknownPathSecret packet was dropped due to a missing entry
     pub struct UnknownPathSecretPacketDropped<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5277,18 +6718,18 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when a credential is accepted (i.e., post packet authentication and passes replay"]
-    #[doc = " check)."]
+    /// Emitted when a credential is accepted (i.e., post packet authentication and passes replay
+    /// check).
     pub struct KeyAccepted<'a> {
         pub credential_id: &'a [u8],
         pub key_id: u64,
-        #[doc = " How far away this credential is from the leading edge of key IDs (after updating the edge)."]
-        #[doc = ""]
-        #[doc = " Zero if this shifted us forward."]
+        /// How far away this credential is from the leading edge of key IDs (after updating the edge).
+        ///
+        /// Zero if this shifted us forward.
         pub gap: u64,
-        #[doc = " How far away this credential is from the leading edge of key IDs (before updating the edge)."]
-        #[doc = ""]
-        #[doc = " Zero if this didn't change the leading edge."]
+        /// How far away this credential is from the leading edge of key IDs (before updating the edge).
+        ///
+        /// Zero if this didn't change the leading edge.
         pub forward_shift: u64,
     }
     impl<'a> IntoEvent<api::KeyAccepted<'a>> for KeyAccepted<'a> {
@@ -5309,7 +6750,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when credential replay was definitely detected"]
+    /// Emitted when credential replay was definitely detected
     pub struct ReplayDefinitelyDetected<'a> {
         pub credential_id: &'a [u8],
         pub key_id: u64,
@@ -5328,8 +6769,8 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when credential replay was potentially detected, but could not be verified"]
-    #[doc = " due to a limiting tracking window"]
+    /// Emitted when credential replay was potentially detected, but could not be verified
+    /// due to a limiting tracking window
     pub struct ReplayPotentiallyDetected<'a> {
         pub credential_id: &'a [u8],
         pub key_id: u64,
@@ -5351,7 +6792,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an ReplayDetected packet was sent"]
+    /// Emitted when an ReplayDetected packet was sent
     pub struct ReplayDetectedPacketSent<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5370,7 +6811,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an ReplayDetected packet was received"]
+    /// Emitted when an ReplayDetected packet was received
     pub struct ReplayDetectedPacketReceived<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5389,7 +6830,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an StaleKey packet was authentic and processed"]
+    /// Emitted when an StaleKey packet was authentic and processed
     pub struct ReplayDetectedPacketAccepted<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5411,7 +6852,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an ReplayDetected packet was rejected as invalid"]
+    /// Emitted when an ReplayDetected packet was rejected as invalid
     pub struct ReplayDetectedPacketRejected<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5430,7 +6871,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an ReplayDetected packet was dropped due to a missing entry"]
+    /// Emitted when an ReplayDetected packet was dropped due to a missing entry
     pub struct ReplayDetectedPacketDropped<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5449,7 +6890,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an StaleKey packet was sent"]
+    /// Emitted when an StaleKey packet was sent
     pub struct StaleKeyPacketSent<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5468,7 +6909,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an StaleKey packet was received"]
+    /// Emitted when an StaleKey packet was received
     pub struct StaleKeyPacketReceived<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5487,7 +6928,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an StaleKey packet was authentic and processed"]
+    /// Emitted when an StaleKey packet was authentic and processed
     pub struct StaleKeyPacketAccepted<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5506,7 +6947,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an StaleKey packet was rejected as invalid"]
+    /// Emitted when an StaleKey packet was rejected as invalid
     pub struct StaleKeyPacketRejected<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5525,7 +6966,7 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when an StaleKey packet was dropped due to a missing entry"]
+    /// Emitted when an StaleKey packet was dropped due to a missing entry
     pub struct StaleKeyPacketDropped<'a> {
         pub peer_address: SocketAddress<'a>,
         pub credential_id: &'a [u8],
@@ -5544,9 +6985,9 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when the cache is accessed by peer address"]
-    #[doc = ""]
-    #[doc = " This can be used to track cache hit ratios"]
+    /// Emitted when the cache is accessed by peer address
+    ///
+    /// This can be used to track cache hit ratios
     pub struct PathSecretMapAddressCacheAccessed<'a> {
         pub peer_address: SocketAddress<'a>,
         pub hit: bool,
@@ -5564,9 +7005,9 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when the cache is accessed by peer address successfully"]
-    #[doc = ""]
-    #[doc = " Provides more information about the accessed entry."]
+    /// Emitted when the cache is accessed by peer address successfully
+    ///
+    /// Provides more information about the accessed entry.
     pub struct PathSecretMapAddressCacheAccessedHit<'a> {
         pub peer_address: SocketAddress<'a>,
         pub age: core::time::Duration,
@@ -5584,9 +7025,9 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when the cache is accessed by path secret ID"]
-    #[doc = ""]
-    #[doc = " This can be used to track cache hit ratios"]
+    /// Emitted when the cache is accessed by path secret ID
+    ///
+    /// This can be used to track cache hit ratios
     pub struct PathSecretMapIdCacheAccessed<'a> {
         pub credential_id: &'a [u8],
         pub hit: bool,
@@ -5602,9 +7043,9 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when the cache is accessed by path secret ID successfully"]
-    #[doc = ""]
-    #[doc = " Provides more information about the accessed entry."]
+    /// Emitted when the cache is accessed by path secret ID successfully
+    ///
+    /// Provides more information about the accessed entry.
     pub struct PathSecretMapIdCacheAccessedHit<'a> {
         pub credential_id: &'a [u8],
         pub age: core::time::Duration,
@@ -5622,41 +7063,49 @@ pub mod builder {
         }
     }
     #[derive(Clone, Debug)]
-    #[doc = " Emitted when the cleaner task performed a single cycle"]
-    #[doc = ""]
-    #[doc = " This can be used to track cache utilization"]
+    /// Emitted when the cleaner task performed a single cycle
+    ///
+    /// This can be used to track cache utilization
     pub struct PathSecretMapCleanerCycled {
-        #[doc = " The number of Path Secret ID entries left after the cleaning cycle"]
+        /// The number of Path Secret ID entries left after the cleaning cycle
         pub id_entries: usize,
-        #[doc = " The number of Path Secret ID entries that were retired in the cycle"]
+        /// The number of Path Secret ID entries that were retired in the cycle
         pub id_entries_retired: usize,
-        #[doc = " Count of entries accessed since the last cycle"]
+        /// Count of entries accessed since the last cycle
         pub id_entries_active: usize,
-        #[doc = " The utilization percentage of the active number of entries after the cycle"]
+        /// The utilization percentage of the active number of entries after the cycle
         pub id_entries_active_utilization: f32,
-        #[doc = " The utilization percentage of the available number of entries after the cycle"]
+        /// The utilization percentage of the available number of entries after the cycle
         pub id_entries_utilization: f32,
-        #[doc = " The utilization percentage of the available number of entries before the cycle"]
+        /// The utilization percentage of the available number of entries before the cycle
         pub id_entries_initial_utilization: f32,
-        #[doc = " The number of SocketAddress entries left after the cleaning cycle"]
+        /// The number of SocketAddress entries left after the cleaning cycle
         pub address_entries: usize,
-        #[doc = " Count of entries accessed since the last cycle"]
+        /// Count of entries accessed since the last cycle
         pub address_entries_active: usize,
-        #[doc = " The utilization percentage of the active number of entries after the cycle"]
+        /// The utilization percentage of the active number of entries after the cycle
         pub address_entries_active_utilization: f32,
-        #[doc = " The number of SocketAddress entries that were retired in the cycle"]
+        /// The number of SocketAddress entries that were retired in the cycle
         pub address_entries_retired: usize,
-        #[doc = " The utilization percentage of the available number of address entries after the cycle"]
+        /// The utilization percentage of the available number of address entries after the cycle
         pub address_entries_utilization: f32,
-        #[doc = " The utilization percentage of the available number of address entries before the cycle"]
+        /// The utilization percentage of the available number of address entries before the cycle
         pub address_entries_initial_utilization: f32,
-        #[doc = " The number of handshake requests that are pending after the cleaning cycle"]
+        /// The number of Path Secret ID entries created within the last rehandshake period (usually 24
+        /// hours)
+        pub id_entries_in_last_hs_period: usize,
+        /// The utilization percentage of Path Secret ID entries created within the last rehandshake
+        /// period (usually 24 hours)
+        pub id_entries_in_last_hs_period_utilization: f32,
+        /// The number of handshake requests that are pending after the cleaning cycle
         pub handshake_requests: usize,
-        #[doc = " The number of handshake requests that were retired in the cycle"]
-        pub handshake_requests_retired: usize,
-        #[doc = " How long we kept the handshake lock held (this blocks completing handshakes)."]
+        /// The number of handshake requests that were skipped in the cycle due to running out of time
+        /// (other background handshakes took too long to complete, and so were postponed to the next
+        /// cleaner cycle).
+        pub handshake_requests_skipped: usize,
+        /// How long we kept the handshake lock held (this blocks completing handshakes).
         pub handshake_lock_duration: core::time::Duration,
-        #[doc = " Total duration of a cycle."]
+        /// Total duration of a cycle.
         pub duration: core::time::Duration,
     }
     impl IntoEvent<api::PathSecretMapCleanerCycled> for PathSecretMapCleanerCycled {
@@ -5675,8 +7124,10 @@ pub mod builder {
                 address_entries_retired,
                 address_entries_utilization,
                 address_entries_initial_utilization,
+                id_entries_in_last_hs_period,
+                id_entries_in_last_hs_period_utilization,
                 handshake_requests,
-                handshake_requests_retired,
+                handshake_requests_skipped,
                 handshake_lock_duration,
                 duration,
             } = self;
@@ -5694,10 +7145,42 @@ pub mod builder {
                 address_entries_utilization: address_entries_utilization.into_event(),
                 address_entries_initial_utilization: address_entries_initial_utilization
                     .into_event(),
+                id_entries_in_last_hs_period: id_entries_in_last_hs_period.into_event(),
+                id_entries_in_last_hs_period_utilization: id_entries_in_last_hs_period_utilization
+                    .into_event(),
                 handshake_requests: handshake_requests.into_event(),
-                handshake_requests_retired: handshake_requests_retired.into_event(),
+                handshake_requests_skipped: handshake_requests_skipped.into_event(),
                 handshake_lock_duration: handshake_lock_duration.into_event(),
                 duration: duration.into_event(),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    /// Emitted when the path secret map is serialized to disk
+    pub struct PathSecretMapSerialized {
+        /// The number of entries written to the serialized file
+        pub entries: usize,
+        /// The size of the serialized file, in bytes
+        pub file_size: usize,
+        /// How long serialization took
+        pub duration: core::time::Duration,
+        /// Whether serialization failed
+        pub error: bool,
+    }
+    impl IntoEvent<api::PathSecretMapSerialized> for PathSecretMapSerialized {
+        #[inline]
+        fn into_event(self) -> api::PathSecretMapSerialized {
+            let PathSecretMapSerialized {
+                entries,
+                file_size,
+                duration,
+                error,
+            } = self;
+            api::PathSecretMapSerialized {
+                entries: entries.into_event(),
+                file_size: file_size.into_event(),
+                duration: duration.into_event(),
+                error: error.into_event(),
             }
         }
     }
@@ -5731,6 +7214,56 @@ pub mod builder {
             }
         }
     }
+    #[derive(Clone, Debug)]
+    /// Emitted when a dcQUIC datagram is encrypted
+    pub struct PathSecretMapDatagramEncrypt {
+        /// The wire size of the encrypted datagram packet
+        pub packet_len: usize,
+    }
+    impl IntoEvent<api::PathSecretMapDatagramEncrypt> for PathSecretMapDatagramEncrypt {
+        #[inline]
+        fn into_event(self) -> api::PathSecretMapDatagramEncrypt {
+            let PathSecretMapDatagramEncrypt { packet_len } = self;
+            api::PathSecretMapDatagramEncrypt {
+                packet_len: packet_len.into_event(),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    /// Emitted when a dcQUIC datagram is decrypted
+    pub struct PathSecretMapDatagramDecrypt {
+        /// The wire size of the encrypted datagram packet
+        pub packet_len: usize,
+    }
+    impl IntoEvent<api::PathSecretMapDatagramDecrypt> for PathSecretMapDatagramDecrypt {
+        #[inline]
+        fn into_event(self) -> api::PathSecretMapDatagramDecrypt {
+            let PathSecretMapDatagramDecrypt { packet_len } = self;
+            api::PathSecretMapDatagramDecrypt {
+                packet_len: packet_len.into_event(),
+            }
+        }
+    }
+    #[derive(Clone, Debug)]
+    pub enum EvictionReason {
+        /// Capacity of map exceeded.
+        Capacity,
+        /// UnknownPathSecret received, removing entry.
+        UnknownPathSecret,
+        /// A newer entry is replacing this one, so we're retiring these.
+        Retiring,
+    }
+    impl IntoEvent<api::EvictionReason> for EvictionReason {
+        #[inline]
+        fn into_event(self) -> api::EvictionReason {
+            use api::EvictionReason::*;
+            match self {
+                Self::Capacity => Capacity {},
+                Self::UnknownPathSecret => UnknownPathSecret {},
+                Self::Retiring => Retiring {},
+            }
+        }
+    }
 }
 pub use traits::*;
 mod traits {
@@ -5738,58 +7271,58 @@ mod traits {
     use crate::event::Meta;
     use core::fmt;
     use s2n_quic_core::query;
-    #[doc = r" Allows for events to be subscribed to"]
+    /// Allows for events to be subscribed to
     pub trait Subscriber: 'static + Send + Sync {
-        #[doc = r" An application provided type associated with each connection."]
-        #[doc = r""]
-        #[doc = r" The context provides a mechanism for applications to provide a custom type"]
-        #[doc = r" and update it on each event, e.g. computing statistics. Each event"]
-        #[doc = r" invocation (e.g. [`Subscriber::on_packet_sent`]) also provides mutable"]
-        #[doc = r" access to the context `&mut ConnectionContext` and allows for updating the"]
-        #[doc = r" context."]
-        #[doc = r""]
-        #[doc = r" ```no_run"]
-        #[doc = r" # mod s2n_quic { pub mod provider { pub mod event {"]
-        #[doc = r" #     pub use s2n_quic_core::event::{api as events, api::ConnectionInfo, api::ConnectionMeta, Subscriber};"]
-        #[doc = r" # }}}"]
-        #[doc = r" use s2n_quic::provider::event::{"]
-        #[doc = r"     ConnectionInfo, ConnectionMeta, Subscriber, events::PacketSent"]
-        #[doc = r" };"]
-        #[doc = r""]
-        #[doc = r" pub struct MyEventSubscriber;"]
-        #[doc = r""]
-        #[doc = r" pub struct MyEventContext {"]
-        #[doc = r"     packet_sent: u64,"]
-        #[doc = r" }"]
-        #[doc = r""]
-        #[doc = r" impl Subscriber for MyEventSubscriber {"]
-        #[doc = r"     type ConnectionContext = MyEventContext;"]
-        #[doc = r""]
-        #[doc = r"     fn create_connection_context("]
-        #[doc = r"         &mut self, _meta: &ConnectionMeta,"]
-        #[doc = r"         _info: &ConnectionInfo,"]
-        #[doc = r"     ) -> Self::ConnectionContext {"]
-        #[doc = r"         MyEventContext { packet_sent: 0 }"]
-        #[doc = r"     }"]
-        #[doc = r""]
-        #[doc = r"     fn on_packet_sent("]
-        #[doc = r"         &mut self,"]
-        #[doc = r"         context: &mut Self::ConnectionContext,"]
-        #[doc = r"         _meta: &ConnectionMeta,"]
-        #[doc = r"         _event: &PacketSent,"]
-        #[doc = r"     ) {"]
-        #[doc = r"         context.packet_sent += 1;"]
-        #[doc = r"     }"]
-        #[doc = r" }"]
-        #[doc = r"  ```"]
+        /// An application provided type associated with each connection.
+        ///
+        /// The context provides a mechanism for applications to provide a custom type
+        /// and update it on each event, e.g. computing statistics. Each event
+        /// invocation (e.g. [`Subscriber::on_packet_sent`]) also provides mutable
+        /// access to the context `&mut ConnectionContext` and allows for updating the
+        /// context.
+        ///
+        /// ```no_run
+        /// # mod s2n_quic { pub mod provider { pub mod event {
+        /// #     pub use s2n_quic_core::event::{api as events, api::ConnectionInfo, api::ConnectionMeta, Subscriber};
+        /// # }}}
+        /// use s2n_quic::provider::event::{
+        ///     ConnectionInfo, ConnectionMeta, Subscriber, events::PacketSent
+        /// };
+        ///
+        /// pub struct MyEventSubscriber;
+        ///
+        /// pub struct MyEventContext {
+        ///     packet_sent: u64,
+        /// }
+        ///
+        /// impl Subscriber for MyEventSubscriber {
+        ///     type ConnectionContext = MyEventContext;
+        ///
+        ///     fn create_connection_context(
+        ///         &mut self, _meta: &ConnectionMeta,
+        ///         _info: &ConnectionInfo,
+        ///     ) -> Self::ConnectionContext {
+        ///         MyEventContext { packet_sent: 0 }
+        ///     }
+        ///
+        ///     fn on_packet_sent(
+        ///         &mut self,
+        ///         context: &mut Self::ConnectionContext,
+        ///         _meta: &ConnectionMeta,
+        ///         _event: &PacketSent,
+        ///     ) {
+        ///         context.packet_sent += 1;
+        ///     }
+        /// }
+        ///  ```
         type ConnectionContext: 'static + Send + Sync;
-        #[doc = r" Creates a context to be passed to each connection-related event"]
+        /// Creates a context to be passed to each connection-related event
         fn create_connection_context(
             &self,
             meta: &api::ConnectionMeta,
             info: &api::ConnectionInfo,
         ) -> Self::ConnectionContext;
-        #[doc = "Called when the `AcceptorTcpStarted` event is triggered"]
+        ///Called when the `AcceptorTcpStarted` event is triggered
         #[inline]
         fn on_acceptor_tcp_started(
             &self,
@@ -5799,7 +7332,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorTcpLoopIterationCompleted` event is triggered"]
+        ///Called when the `AcceptorTcpLoopIterationCompleted` event is triggered
         #[inline]
         fn on_acceptor_tcp_loop_iteration_completed(
             &self,
@@ -5809,7 +7342,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorTcpFreshEnqueued` event is triggered"]
+        ///Called when the `AcceptorTcpFreshEnqueued` event is triggered
         #[inline]
         fn on_acceptor_tcp_fresh_enqueued(
             &self,
@@ -5819,7 +7352,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorTcpFreshBatchCompleted` event is triggered"]
+        ///Called when the `AcceptorTcpFreshBatchCompleted` event is triggered
         #[inline]
         fn on_acceptor_tcp_fresh_batch_completed(
             &self,
@@ -5829,7 +7362,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorTcpStreamDropped` event is triggered"]
+        ///Called when the `AcceptorTcpStreamDropped` event is triggered
         #[inline]
         fn on_acceptor_tcp_stream_dropped(
             &self,
@@ -5839,7 +7372,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorTcpStreamReplaced` event is triggered"]
+        ///Called when the `AcceptorTcpStreamReplaced` event is triggered
         #[inline]
         fn on_acceptor_tcp_stream_replaced(
             &self,
@@ -5849,7 +7382,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorTcpPacketReceived` event is triggered"]
+        ///Called when the `AcceptorTcpPacketReceived` event is triggered
         #[inline]
         fn on_acceptor_tcp_packet_received(
             &self,
@@ -5859,7 +7392,47 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorTcpPacketDropped` event is triggered"]
+        ///Called when the `AcceptorTcpTlsStarted` event is triggered
+        #[inline]
+        fn on_acceptor_tcp_tls_started(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpTlsStarted,
+        ) {
+            let _ = meta;
+            let _ = event;
+        }
+        ///Called when the `AcceptorTcpTlsStreamEnqueued` event is triggered
+        #[inline]
+        fn on_acceptor_tcp_tls_stream_enqueued(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpTlsStreamEnqueued,
+        ) {
+            let _ = meta;
+            let _ = event;
+        }
+        ///Called when the `AcceptorTcpTlsStreamRejected` event is triggered
+        #[inline]
+        fn on_acceptor_tcp_tls_stream_rejected(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpTlsStreamRejected,
+        ) {
+            let _ = meta;
+            let _ = event;
+        }
+        ///Called when the `AcceptorTcpSyntheticTlsStreamRejected` event is triggered
+        #[inline]
+        fn on_acceptor_tcp_synthetic_tls_stream_rejected(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpSyntheticTlsStreamRejected,
+        ) {
+            let _ = meta;
+            let _ = event;
+        }
+        ///Called when the `AcceptorTcpPacketDropped` event is triggered
         #[inline]
         fn on_acceptor_tcp_packet_dropped(
             &self,
@@ -5869,7 +7442,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorTcpStreamEnqueued` event is triggered"]
+        ///Called when the `AcceptorTcpStreamEnqueued` event is triggered
         #[inline]
         fn on_acceptor_tcp_stream_enqueued(
             &self,
@@ -5879,7 +7452,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorTcpIoError` event is triggered"]
+        ///Called when the `AcceptorTcpIoError` event is triggered
         #[inline]
         fn on_acceptor_tcp_io_error(
             &self,
@@ -5889,7 +7462,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorTcpSocketSent` event is triggered"]
+        ///Called when the `AcceptorTcpSocketSent` event is triggered
         #[inline]
         fn on_acceptor_tcp_socket_sent(
             &self,
@@ -5899,7 +7472,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorTcpSocketReceived` event is triggered"]
+        ///Called when the `AcceptorTcpSocketReceived` event is triggered
         #[inline]
         fn on_acceptor_tcp_socket_received(
             &self,
@@ -5909,7 +7482,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorUdpStarted` event is triggered"]
+        ///Called when the `AcceptorUdpStarted` event is triggered
         #[inline]
         fn on_acceptor_udp_started(
             &self,
@@ -5919,7 +7492,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorUdpDatagramReceived` event is triggered"]
+        ///Called when the `AcceptorUdpDatagramReceived` event is triggered
         #[inline]
         fn on_acceptor_udp_datagram_received(
             &self,
@@ -5929,7 +7502,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorUdpPacketReceived` event is triggered"]
+        ///Called when the `AcceptorUdpPacketReceived` event is triggered
         #[inline]
         fn on_acceptor_udp_packet_received(
             &self,
@@ -5939,7 +7512,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorUdpPacketDropped` event is triggered"]
+        ///Called when the `AcceptorUdpPacketDropped` event is triggered
         #[inline]
         fn on_acceptor_udp_packet_dropped(
             &self,
@@ -5949,7 +7522,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorUdpStreamEnqueued` event is triggered"]
+        ///Called when the `AcceptorUdpStreamEnqueued` event is triggered
         #[inline]
         fn on_acceptor_udp_stream_enqueued(
             &self,
@@ -5959,7 +7532,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorUdpIoError` event is triggered"]
+        ///Called when the `AcceptorUdpIoError` event is triggered
         #[inline]
         fn on_acceptor_udp_io_error(
             &self,
@@ -5969,7 +7542,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorStreamPruned` event is triggered"]
+        ///Called when the `AcceptorStreamPruned` event is triggered
         #[inline]
         fn on_acceptor_stream_pruned(
             &self,
@@ -5979,7 +7552,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `AcceptorStreamDequeued` event is triggered"]
+        ///Called when the `AcceptorStreamDequeued` event is triggered
         #[inline]
         fn on_acceptor_stream_dequeued(
             &self,
@@ -5989,7 +7562,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamWriteFlushed` event is triggered"]
+        ///Called when the `StreamWriteFlushed` event is triggered
         #[inline]
         fn on_stream_write_flushed(
             &self,
@@ -6001,7 +7574,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamWriteFinFlushed` event is triggered"]
+        ///Called when the `StreamWriteFinFlushed` event is triggered
         #[inline]
         fn on_stream_write_fin_flushed(
             &self,
@@ -6013,7 +7586,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamWriteBlocked` event is triggered"]
+        ///Called when the `StreamWriteBlocked` event is triggered
         #[inline]
         fn on_stream_write_blocked(
             &self,
@@ -6025,7 +7598,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamWriteErrored` event is triggered"]
+        ///Called when the `StreamWriteErrored` event is triggered
         #[inline]
         fn on_stream_write_errored(
             &self,
@@ -6037,7 +7610,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamWriteKeyUpdated` event is triggered"]
+        ///Called when the `StreamWriteKeyUpdated` event is triggered
         #[inline]
         fn on_stream_write_key_updated(
             &self,
@@ -6049,7 +7622,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamWriteAllocated` event is triggered"]
+        ///Called when the `StreamWriteAllocated` event is triggered
         #[inline]
         fn on_stream_write_allocated(
             &self,
@@ -6061,7 +7634,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamWriteShutdown` event is triggered"]
+        ///Called when the `StreamWriteShutdown` event is triggered
         #[inline]
         fn on_stream_write_shutdown(
             &self,
@@ -6073,7 +7646,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamWriteSocketFlushed` event is triggered"]
+        ///Called when the `StreamWriteSocketFlushed` event is triggered
         #[inline]
         fn on_stream_write_socket_flushed(
             &self,
@@ -6085,7 +7658,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamWriteSocketBlocked` event is triggered"]
+        ///Called when the `StreamWriteSocketBlocked` event is triggered
         #[inline]
         fn on_stream_write_socket_blocked(
             &self,
@@ -6097,7 +7670,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamWriteSocketErrored` event is triggered"]
+        ///Called when the `StreamWriteSocketErrored` event is triggered
         #[inline]
         fn on_stream_write_socket_errored(
             &self,
@@ -6109,7 +7682,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamReadFlushed` event is triggered"]
+        ///Called when the `StreamReadFlushed` event is triggered
         #[inline]
         fn on_stream_read_flushed(
             &self,
@@ -6121,7 +7694,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamReadFinFlushed` event is triggered"]
+        ///Called when the `StreamReadFinFlushed` event is triggered
         #[inline]
         fn on_stream_read_fin_flushed(
             &self,
@@ -6133,7 +7706,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamReadBlocked` event is triggered"]
+        ///Called when the `StreamReadBlocked` event is triggered
         #[inline]
         fn on_stream_read_blocked(
             &self,
@@ -6145,7 +7718,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamReadErrored` event is triggered"]
+        ///Called when the `StreamReadErrored` event is triggered
         #[inline]
         fn on_stream_read_errored(
             &self,
@@ -6157,7 +7730,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamReadKeyUpdated` event is triggered"]
+        ///Called when the `StreamReadKeyUpdated` event is triggered
         #[inline]
         fn on_stream_read_key_updated(
             &self,
@@ -6169,7 +7742,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamReadShutdown` event is triggered"]
+        ///Called when the `StreamReadShutdown` event is triggered
         #[inline]
         fn on_stream_read_shutdown(
             &self,
@@ -6181,7 +7754,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamReadSocketFlushed` event is triggered"]
+        ///Called when the `StreamReadSocketFlushed` event is triggered
         #[inline]
         fn on_stream_read_socket_flushed(
             &self,
@@ -6193,7 +7766,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamReadSocketBlocked` event is triggered"]
+        ///Called when the `StreamReadSocketBlocked` event is triggered
         #[inline]
         fn on_stream_read_socket_blocked(
             &self,
@@ -6205,7 +7778,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamReadSocketErrored` event is triggered"]
+        ///Called when the `StreamReadSocketErrored` event is triggered
         #[inline]
         fn on_stream_read_socket_errored(
             &self,
@@ -6217,7 +7790,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamDecryptPacket` event is triggered"]
+        ///Called when the `StreamDecryptPacket` event is triggered
         #[inline]
         fn on_stream_decrypt_packet(
             &self,
@@ -6229,19 +7802,35 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamTcpConnect` event is triggered"]
+        ///Called when the `StreamTcpConnect` event is triggered
         #[inline]
         fn on_stream_tcp_connect(&self, meta: &api::EndpointMeta, event: &api::StreamTcpConnect) {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamConnect` event is triggered"]
+        ///Called when the `StreamTlsConnect` event is triggered
+        #[inline]
+        fn on_stream_tls_connect(&self, meta: &api::EndpointMeta, event: &api::StreamTlsConnect) {
+            let _ = meta;
+            let _ = event;
+        }
+        ///Called when the `StreamTlsConnectError` event is triggered
+        #[inline]
+        fn on_stream_tls_connect_error(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::StreamTlsConnectError,
+        ) {
+            let _ = meta;
+            let _ = event;
+        }
+        ///Called when the `StreamConnect` event is triggered
         #[inline]
         fn on_stream_connect(&self, meta: &api::EndpointMeta, event: &api::StreamConnect) {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamConnectError` event is triggered"]
+        ///Called when the `StreamConnectError` event is triggered
         #[inline]
         fn on_stream_connect_error(
             &self,
@@ -6251,7 +7840,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamPacketTransmitted` event is triggered"]
+        ///Called when the `StreamPacketTransmitted` event is triggered
         #[inline]
         fn on_stream_packet_transmitted(
             &self,
@@ -6263,7 +7852,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamProbeTransmitted` event is triggered"]
+        ///Called when the `StreamProbeTransmitted` event is triggered
         #[inline]
         fn on_stream_probe_transmitted(
             &self,
@@ -6275,7 +7864,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamPacketReceived` event is triggered"]
+        ///Called when the `StreamPacketReceived` event is triggered
         #[inline]
         fn on_stream_packet_received(
             &self,
@@ -6287,7 +7876,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamPacketLost` event is triggered"]
+        ///Called when the `StreamPacketLost` event is triggered
         #[inline]
         fn on_stream_packet_lost(
             &self,
@@ -6299,7 +7888,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamPacketAcked` event is triggered"]
+        ///Called when the `StreamPacketAcked` event is triggered
         #[inline]
         fn on_stream_packet_acked(
             &self,
@@ -6311,7 +7900,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamPacketSpuriouslyRetransmitted` event is triggered"]
+        ///Called when the `StreamPacketSpuriouslyRetransmitted` event is triggered
         #[inline]
         fn on_stream_packet_spuriously_retransmitted(
             &self,
@@ -6323,7 +7912,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamMaxDataReceived` event is triggered"]
+        ///Called when the `StreamMaxDataReceived` event is triggered
         #[inline]
         fn on_stream_max_data_received(
             &self,
@@ -6335,7 +7924,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamControlPacketTransmitted` event is triggered"]
+        ///Called when the `StreamControlPacketTransmitted` event is triggered
         #[inline]
         fn on_stream_control_packet_transmitted(
             &self,
@@ -6347,7 +7936,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamControlPacketReceived` event is triggered"]
+        ///Called when the `StreamControlPacketReceived` event is triggered
         #[inline]
         fn on_stream_control_packet_received(
             &self,
@@ -6359,7 +7948,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamReceiverErrored` event is triggered"]
+        ///Called when the `StreamReceiverErrored` event is triggered
         #[inline]
         fn on_stream_receiver_errored(
             &self,
@@ -6371,7 +7960,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StreamSenderErrored` event is triggered"]
+        ///Called when the `StreamSenderErrored` event is triggered
         #[inline]
         fn on_stream_sender_errored(
             &self,
@@ -6383,7 +7972,19 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `ConnectionClosed` event is triggered"]
+        ///Called when the `StreamHandshakePacketRejected` event is triggered
+        #[inline]
+        fn on_stream_handshake_packet_rejected(
+            &self,
+            context: &Self::ConnectionContext,
+            meta: &api::ConnectionMeta,
+            event: &api::StreamHandshakePacketRejected,
+        ) {
+            let _ = context;
+            let _ = meta;
+            let _ = event;
+        }
+        ///Called when the `ConnectionClosed` event is triggered
         #[inline]
         fn on_connection_closed(
             &self,
@@ -6395,7 +7996,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `EndpointInitialized` event is triggered"]
+        ///Called when the `EndpointInitialized` event is triggered
         #[inline]
         fn on_endpoint_initialized(
             &self,
@@ -6405,7 +8006,17 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `PathSecretMapInitialized` event is triggered"]
+        ///Called when the `DcConnectionTimeout` event is triggered
+        #[inline]
+        fn on_dc_connection_timeout(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::DcConnectionTimeout,
+        ) {
+            let _ = meta;
+            let _ = event;
+        }
+        ///Called when the `PathSecretMapInitialized` event is triggered
         #[inline]
         fn on_path_secret_map_initialized(
             &self,
@@ -6415,7 +8026,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `PathSecretMapUninitialized` event is triggered"]
+        ///Called when the `PathSecretMapUninitialized` event is triggered
         #[inline]
         fn on_path_secret_map_uninitialized(
             &self,
@@ -6425,7 +8036,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `PathSecretMapBackgroundHandshakeRequested` event is triggered"]
+        ///Called when the `PathSecretMapBackgroundHandshakeRequested` event is triggered
         #[inline]
         fn on_path_secret_map_background_handshake_requested(
             &self,
@@ -6435,7 +8046,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `PathSecretMapEntryInserted` event is triggered"]
+        ///Called when the `PathSecretMapEntryInserted` event is triggered
         #[inline]
         fn on_path_secret_map_entry_inserted(
             &self,
@@ -6445,7 +8056,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `PathSecretMapEntryReady` event is triggered"]
+        ///Called when the `PathSecretMapEntryReady` event is triggered
         #[inline]
         fn on_path_secret_map_entry_ready(
             &self,
@@ -6455,7 +8066,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `PathSecretMapEntryReplaced` event is triggered"]
+        ///Called when the `PathSecretMapEntryReplaced` event is triggered
         #[inline]
         fn on_path_secret_map_entry_replaced(
             &self,
@@ -6465,7 +8076,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `PathSecretMapIdEntryEvicted` event is triggered"]
+        ///Called when the `PathSecretMapIdEntryEvicted` event is triggered
         #[inline]
         fn on_path_secret_map_id_entry_evicted(
             &self,
@@ -6475,7 +8086,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `PathSecretMapAddressEntryEvicted` event is triggered"]
+        ///Called when the `PathSecretMapAddressEntryEvicted` event is triggered
         #[inline]
         fn on_path_secret_map_address_entry_evicted(
             &self,
@@ -6485,7 +8096,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `UnknownPathSecretPacketSent` event is triggered"]
+        ///Called when the `UnknownPathSecretPacketSent` event is triggered
         #[inline]
         fn on_unknown_path_secret_packet_sent(
             &self,
@@ -6495,7 +8106,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `UnknownPathSecretPacketReceived` event is triggered"]
+        ///Called when the `UnknownPathSecretPacketReceived` event is triggered
         #[inline]
         fn on_unknown_path_secret_packet_received(
             &self,
@@ -6505,7 +8116,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `UnknownPathSecretPacketAccepted` event is triggered"]
+        ///Called when the `UnknownPathSecretPacketAccepted` event is triggered
         #[inline]
         fn on_unknown_path_secret_packet_accepted(
             &self,
@@ -6515,7 +8126,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `UnknownPathSecretPacketRejected` event is triggered"]
+        ///Called when the `UnknownPathSecretPacketRejected` event is triggered
         #[inline]
         fn on_unknown_path_secret_packet_rejected(
             &self,
@@ -6525,7 +8136,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `UnknownPathSecretPacketDropped` event is triggered"]
+        ///Called when the `UnknownPathSecretPacketDropped` event is triggered
         #[inline]
         fn on_unknown_path_secret_packet_dropped(
             &self,
@@ -6535,13 +8146,13 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `KeyAccepted` event is triggered"]
+        ///Called when the `KeyAccepted` event is triggered
         #[inline]
         fn on_key_accepted(&self, meta: &api::EndpointMeta, event: &api::KeyAccepted) {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `ReplayDefinitelyDetected` event is triggered"]
+        ///Called when the `ReplayDefinitelyDetected` event is triggered
         #[inline]
         fn on_replay_definitely_detected(
             &self,
@@ -6551,7 +8162,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `ReplayPotentiallyDetected` event is triggered"]
+        ///Called when the `ReplayPotentiallyDetected` event is triggered
         #[inline]
         fn on_replay_potentially_detected(
             &self,
@@ -6561,7 +8172,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `ReplayDetectedPacketSent` event is triggered"]
+        ///Called when the `ReplayDetectedPacketSent` event is triggered
         #[inline]
         fn on_replay_detected_packet_sent(
             &self,
@@ -6571,7 +8182,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `ReplayDetectedPacketReceived` event is triggered"]
+        ///Called when the `ReplayDetectedPacketReceived` event is triggered
         #[inline]
         fn on_replay_detected_packet_received(
             &self,
@@ -6581,7 +8192,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `ReplayDetectedPacketAccepted` event is triggered"]
+        ///Called when the `ReplayDetectedPacketAccepted` event is triggered
         #[inline]
         fn on_replay_detected_packet_accepted(
             &self,
@@ -6591,7 +8202,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `ReplayDetectedPacketRejected` event is triggered"]
+        ///Called when the `ReplayDetectedPacketRejected` event is triggered
         #[inline]
         fn on_replay_detected_packet_rejected(
             &self,
@@ -6601,7 +8212,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `ReplayDetectedPacketDropped` event is triggered"]
+        ///Called when the `ReplayDetectedPacketDropped` event is triggered
         #[inline]
         fn on_replay_detected_packet_dropped(
             &self,
@@ -6611,7 +8222,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StaleKeyPacketSent` event is triggered"]
+        ///Called when the `StaleKeyPacketSent` event is triggered
         #[inline]
         fn on_stale_key_packet_sent(
             &self,
@@ -6621,7 +8232,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StaleKeyPacketReceived` event is triggered"]
+        ///Called when the `StaleKeyPacketReceived` event is triggered
         #[inline]
         fn on_stale_key_packet_received(
             &self,
@@ -6631,7 +8242,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StaleKeyPacketAccepted` event is triggered"]
+        ///Called when the `StaleKeyPacketAccepted` event is triggered
         #[inline]
         fn on_stale_key_packet_accepted(
             &self,
@@ -6641,7 +8252,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StaleKeyPacketRejected` event is triggered"]
+        ///Called when the `StaleKeyPacketRejected` event is triggered
         #[inline]
         fn on_stale_key_packet_rejected(
             &self,
@@ -6651,7 +8262,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `StaleKeyPacketDropped` event is triggered"]
+        ///Called when the `StaleKeyPacketDropped` event is triggered
         #[inline]
         fn on_stale_key_packet_dropped(
             &self,
@@ -6661,7 +8272,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `PathSecretMapAddressCacheAccessed` event is triggered"]
+        ///Called when the `PathSecretMapAddressCacheAccessed` event is triggered
         #[inline]
         fn on_path_secret_map_address_cache_accessed(
             &self,
@@ -6671,7 +8282,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `PathSecretMapAddressCacheAccessedHit` event is triggered"]
+        ///Called when the `PathSecretMapAddressCacheAccessedHit` event is triggered
         #[inline]
         fn on_path_secret_map_address_cache_accessed_hit(
             &self,
@@ -6681,7 +8292,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `PathSecretMapIdCacheAccessed` event is triggered"]
+        ///Called when the `PathSecretMapIdCacheAccessed` event is triggered
         #[inline]
         fn on_path_secret_map_id_cache_accessed(
             &self,
@@ -6691,7 +8302,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `PathSecretMapIdCacheAccessedHit` event is triggered"]
+        ///Called when the `PathSecretMapIdCacheAccessedHit` event is triggered
         #[inline]
         fn on_path_secret_map_id_cache_accessed_hit(
             &self,
@@ -6701,7 +8312,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `PathSecretMapCleanerCycled` event is triggered"]
+        ///Called when the `PathSecretMapCleanerCycled` event is triggered
         #[inline]
         fn on_path_secret_map_cleaner_cycled(
             &self,
@@ -6711,7 +8322,17 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `PathSecretMapIdWriteLock` event is triggered"]
+        ///Called when the `PathSecretMapSerialized` event is triggered
+        #[inline]
+        fn on_path_secret_map_serialized(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::PathSecretMapSerialized,
+        ) {
+            let _ = meta;
+            let _ = event;
+        }
+        ///Called when the `PathSecretMapIdWriteLock` event is triggered
         #[inline]
         fn on_path_secret_map_id_write_lock(
             &self,
@@ -6721,7 +8342,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = "Called when the `PathSecretMapAddressWriteLock` event is triggered"]
+        ///Called when the `PathSecretMapAddressWriteLock` event is triggered
         #[inline]
         fn on_path_secret_map_address_write_lock(
             &self,
@@ -6731,13 +8352,33 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = r" Called for each event that relates to the endpoint and all connections"]
+        ///Called when the `PathSecretMapDatagramEncrypt` event is triggered
+        #[inline]
+        fn on_path_secret_map_datagram_encrypt(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::PathSecretMapDatagramEncrypt,
+        ) {
+            let _ = meta;
+            let _ = event;
+        }
+        ///Called when the `PathSecretMapDatagramDecrypt` event is triggered
+        #[inline]
+        fn on_path_secret_map_datagram_decrypt(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::PathSecretMapDatagramDecrypt,
+        ) {
+            let _ = meta;
+            let _ = event;
+        }
+        /// Called for each event that relates to the endpoint and all connections
         #[inline]
         fn on_event<M: Meta, E: Event>(&self, meta: &M, event: &E) {
             let _ = meta;
             let _ = event;
         }
-        #[doc = r" Called for each event that relates to a connection"]
+        /// Called for each event that relates to a connection
         #[inline]
         fn on_connection_event<E: Event>(
             &self,
@@ -6749,7 +8390,7 @@ mod traits {
             let _ = meta;
             let _ = event;
         }
-        #[doc = r" Used for querying the `Subscriber::ConnectionContext` on a Subscriber"]
+        /// Used for querying the `Subscriber::ConnectionContext` on a Subscriber
         #[inline]
         fn query(
             context: &Self::ConnectionContext,
@@ -6825,6 +8466,41 @@ mod traits {
             event: &api::AcceptorTcpPacketReceived,
         ) {
             self.as_ref().on_acceptor_tcp_packet_received(meta, event);
+        }
+        #[inline]
+        fn on_acceptor_tcp_tls_started(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpTlsStarted,
+        ) {
+            self.as_ref().on_acceptor_tcp_tls_started(meta, event);
+        }
+        #[inline]
+        fn on_acceptor_tcp_tls_stream_enqueued(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpTlsStreamEnqueued,
+        ) {
+            self.as_ref()
+                .on_acceptor_tcp_tls_stream_enqueued(meta, event);
+        }
+        #[inline]
+        fn on_acceptor_tcp_tls_stream_rejected(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpTlsStreamRejected,
+        ) {
+            self.as_ref()
+                .on_acceptor_tcp_tls_stream_rejected(meta, event);
+        }
+        #[inline]
+        fn on_acceptor_tcp_synthetic_tls_stream_rejected(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpSyntheticTlsStreamRejected,
+        ) {
+            self.as_ref()
+                .on_acceptor_tcp_synthetic_tls_stream_rejected(meta, event);
         }
         #[inline]
         fn on_acceptor_tcp_packet_dropped(
@@ -7126,6 +8802,18 @@ mod traits {
             self.as_ref().on_stream_tcp_connect(meta, event);
         }
         #[inline]
+        fn on_stream_tls_connect(&self, meta: &api::EndpointMeta, event: &api::StreamTlsConnect) {
+            self.as_ref().on_stream_tls_connect(meta, event);
+        }
+        #[inline]
+        fn on_stream_tls_connect_error(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::StreamTlsConnectError,
+        ) {
+            self.as_ref().on_stream_tls_connect_error(meta, event);
+        }
+        #[inline]
         fn on_stream_connect(&self, meta: &api::EndpointMeta, event: &api::StreamConnect) {
             self.as_ref().on_stream_connect(meta, event);
         }
@@ -7245,6 +8933,16 @@ mod traits {
             self.as_ref().on_stream_sender_errored(context, meta, event);
         }
         #[inline]
+        fn on_stream_handshake_packet_rejected(
+            &self,
+            context: &Self::ConnectionContext,
+            meta: &api::ConnectionMeta,
+            event: &api::StreamHandshakePacketRejected,
+        ) {
+            self.as_ref()
+                .on_stream_handshake_packet_rejected(context, meta, event);
+        }
+        #[inline]
         fn on_connection_closed(
             &self,
             context: &Self::ConnectionContext,
@@ -7260,6 +8958,14 @@ mod traits {
             event: &api::EndpointInitialized,
         ) {
             self.as_ref().on_endpoint_initialized(meta, event);
+        }
+        #[inline]
+        fn on_dc_connection_timeout(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::DcConnectionTimeout,
+        ) {
+            self.as_ref().on_dc_connection_timeout(meta, event);
         }
         #[inline]
         fn on_path_secret_map_initialized(
@@ -7521,6 +9227,14 @@ mod traits {
             self.as_ref().on_path_secret_map_cleaner_cycled(meta, event);
         }
         #[inline]
+        fn on_path_secret_map_serialized(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::PathSecretMapSerialized,
+        ) {
+            self.as_ref().on_path_secret_map_serialized(meta, event);
+        }
+        #[inline]
         fn on_path_secret_map_id_write_lock(
             &self,
             meta: &api::EndpointMeta,
@@ -7538,6 +9252,24 @@ mod traits {
                 .on_path_secret_map_address_write_lock(meta, event);
         }
         #[inline]
+        fn on_path_secret_map_datagram_encrypt(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::PathSecretMapDatagramEncrypt,
+        ) {
+            self.as_ref()
+                .on_path_secret_map_datagram_encrypt(meta, event);
+        }
+        #[inline]
+        fn on_path_secret_map_datagram_decrypt(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::PathSecretMapDatagramDecrypt,
+        ) {
+            self.as_ref()
+                .on_path_secret_map_datagram_decrypt(meta, event);
+        }
+        #[inline]
         fn on_event<M: Meta, E: Event>(&self, meta: &M, event: &E) {
             self.as_ref().on_event(meta, event);
         }
@@ -7551,8 +9283,8 @@ mod traits {
             self.as_ref().on_connection_event(context, meta, event);
         }
     }
-    #[doc = r" Subscriber is implemented for a 2-element tuple to make it easy to compose multiple"]
-    #[doc = r" subscribers."]
+    /// Subscriber is implemented for a 2-element tuple to make it easy to compose multiple
+    /// subscribers.
     impl<A, B> Subscriber for (A, B)
     where
         A: Subscriber,
@@ -7632,6 +9364,42 @@ mod traits {
         ) {
             (self.0).on_acceptor_tcp_packet_received(meta, event);
             (self.1).on_acceptor_tcp_packet_received(meta, event);
+        }
+        #[inline]
+        fn on_acceptor_tcp_tls_started(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpTlsStarted,
+        ) {
+            (self.0).on_acceptor_tcp_tls_started(meta, event);
+            (self.1).on_acceptor_tcp_tls_started(meta, event);
+        }
+        #[inline]
+        fn on_acceptor_tcp_tls_stream_enqueued(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpTlsStreamEnqueued,
+        ) {
+            (self.0).on_acceptor_tcp_tls_stream_enqueued(meta, event);
+            (self.1).on_acceptor_tcp_tls_stream_enqueued(meta, event);
+        }
+        #[inline]
+        fn on_acceptor_tcp_tls_stream_rejected(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpTlsStreamRejected,
+        ) {
+            (self.0).on_acceptor_tcp_tls_stream_rejected(meta, event);
+            (self.1).on_acceptor_tcp_tls_stream_rejected(meta, event);
+        }
+        #[inline]
+        fn on_acceptor_tcp_synthetic_tls_stream_rejected(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpSyntheticTlsStreamRejected,
+        ) {
+            (self.0).on_acceptor_tcp_synthetic_tls_stream_rejected(meta, event);
+            (self.1).on_acceptor_tcp_synthetic_tls_stream_rejected(meta, event);
         }
         #[inline]
         fn on_acceptor_tcp_packet_dropped(
@@ -7956,6 +9724,20 @@ mod traits {
             (self.1).on_stream_tcp_connect(meta, event);
         }
         #[inline]
+        fn on_stream_tls_connect(&self, meta: &api::EndpointMeta, event: &api::StreamTlsConnect) {
+            (self.0).on_stream_tls_connect(meta, event);
+            (self.1).on_stream_tls_connect(meta, event);
+        }
+        #[inline]
+        fn on_stream_tls_connect_error(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::StreamTlsConnectError,
+        ) {
+            (self.0).on_stream_tls_connect_error(meta, event);
+            (self.1).on_stream_tls_connect_error(meta, event);
+        }
+        #[inline]
         fn on_stream_connect(&self, meta: &api::EndpointMeta, event: &api::StreamConnect) {
             (self.0).on_stream_connect(meta, event);
             (self.1).on_stream_connect(meta, event);
@@ -8080,6 +9862,16 @@ mod traits {
             (self.1).on_stream_sender_errored(&context.1, meta, event);
         }
         #[inline]
+        fn on_stream_handshake_packet_rejected(
+            &self,
+            context: &Self::ConnectionContext,
+            meta: &api::ConnectionMeta,
+            event: &api::StreamHandshakePacketRejected,
+        ) {
+            (self.0).on_stream_handshake_packet_rejected(&context.0, meta, event);
+            (self.1).on_stream_handshake_packet_rejected(&context.1, meta, event);
+        }
+        #[inline]
         fn on_connection_closed(
             &self,
             context: &Self::ConnectionContext,
@@ -8097,6 +9889,15 @@ mod traits {
         ) {
             (self.0).on_endpoint_initialized(meta, event);
             (self.1).on_endpoint_initialized(meta, event);
+        }
+        #[inline]
+        fn on_dc_connection_timeout(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::DcConnectionTimeout,
+        ) {
+            (self.0).on_dc_connection_timeout(meta, event);
+            (self.1).on_dc_connection_timeout(meta, event);
         }
         #[inline]
         fn on_path_secret_map_initialized(
@@ -8374,6 +10175,15 @@ mod traits {
             (self.1).on_path_secret_map_cleaner_cycled(meta, event);
         }
         #[inline]
+        fn on_path_secret_map_serialized(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::PathSecretMapSerialized,
+        ) {
+            (self.0).on_path_secret_map_serialized(meta, event);
+            (self.1).on_path_secret_map_serialized(meta, event);
+        }
+        #[inline]
         fn on_path_secret_map_id_write_lock(
             &self,
             meta: &api::EndpointMeta,
@@ -8390,6 +10200,24 @@ mod traits {
         ) {
             (self.0).on_path_secret_map_address_write_lock(meta, event);
             (self.1).on_path_secret_map_address_write_lock(meta, event);
+        }
+        #[inline]
+        fn on_path_secret_map_datagram_encrypt(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::PathSecretMapDatagramEncrypt,
+        ) {
+            (self.0).on_path_secret_map_datagram_encrypt(meta, event);
+            (self.1).on_path_secret_map_datagram_encrypt(meta, event);
+        }
+        #[inline]
+        fn on_path_secret_map_datagram_decrypt(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::PathSecretMapDatagramDecrypt,
+        ) {
+            (self.0).on_path_secret_map_datagram_decrypt(meta, event);
+            (self.1).on_path_secret_map_datagram_decrypt(meta, event);
         }
         #[inline]
         fn on_event<M: Meta, E: Event>(&self, meta: &M, event: &E) {
@@ -8418,160 +10246,183 @@ mod traits {
         }
     }
     pub trait EndpointPublisher {
-        #[doc = "Publishes a `AcceptorTcpStarted` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorTcpStarted` event to the publisher's subscriber
         fn on_acceptor_tcp_started(&self, event: builder::AcceptorTcpStarted);
-        #[doc = "Publishes a `AcceptorTcpLoopIterationCompleted` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorTcpLoopIterationCompleted` event to the publisher's subscriber
         fn on_acceptor_tcp_loop_iteration_completed(
             &self,
             event: builder::AcceptorTcpLoopIterationCompleted,
         );
-        #[doc = "Publishes a `AcceptorTcpFreshEnqueued` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorTcpFreshEnqueued` event to the publisher's subscriber
         fn on_acceptor_tcp_fresh_enqueued(&self, event: builder::AcceptorTcpFreshEnqueued);
-        #[doc = "Publishes a `AcceptorTcpFreshBatchCompleted` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorTcpFreshBatchCompleted` event to the publisher's subscriber
         fn on_acceptor_tcp_fresh_batch_completed(
             &self,
             event: builder::AcceptorTcpFreshBatchCompleted,
         );
-        #[doc = "Publishes a `AcceptorTcpStreamDropped` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorTcpStreamDropped` event to the publisher's subscriber
         fn on_acceptor_tcp_stream_dropped(&self, event: builder::AcceptorTcpStreamDropped);
-        #[doc = "Publishes a `AcceptorTcpStreamReplaced` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorTcpStreamReplaced` event to the publisher's subscriber
         fn on_acceptor_tcp_stream_replaced(&self, event: builder::AcceptorTcpStreamReplaced);
-        #[doc = "Publishes a `AcceptorTcpPacketReceived` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorTcpPacketReceived` event to the publisher's subscriber
         fn on_acceptor_tcp_packet_received(&self, event: builder::AcceptorTcpPacketReceived);
-        #[doc = "Publishes a `AcceptorTcpPacketDropped` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorTcpTlsStarted` event to the publisher's subscriber
+        fn on_acceptor_tcp_tls_started(&self, event: builder::AcceptorTcpTlsStarted);
+        ///Publishes a `AcceptorTcpTlsStreamEnqueued` event to the publisher's subscriber
+        fn on_acceptor_tcp_tls_stream_enqueued(&self, event: builder::AcceptorTcpTlsStreamEnqueued);
+        ///Publishes a `AcceptorTcpTlsStreamRejected` event to the publisher's subscriber
+        fn on_acceptor_tcp_tls_stream_rejected(&self, event: builder::AcceptorTcpTlsStreamRejected);
+        ///Publishes a `AcceptorTcpSyntheticTlsStreamRejected` event to the publisher's subscriber
+        fn on_acceptor_tcp_synthetic_tls_stream_rejected(
+            &self,
+            event: builder::AcceptorTcpSyntheticTlsStreamRejected,
+        );
+        ///Publishes a `AcceptorTcpPacketDropped` event to the publisher's subscriber
         fn on_acceptor_tcp_packet_dropped(&self, event: builder::AcceptorTcpPacketDropped);
-        #[doc = "Publishes a `AcceptorTcpStreamEnqueued` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorTcpStreamEnqueued` event to the publisher's subscriber
         fn on_acceptor_tcp_stream_enqueued(&self, event: builder::AcceptorTcpStreamEnqueued);
-        #[doc = "Publishes a `AcceptorTcpIoError` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorTcpIoError` event to the publisher's subscriber
         fn on_acceptor_tcp_io_error(&self, event: builder::AcceptorTcpIoError);
-        #[doc = "Publishes a `AcceptorTcpSocketSent` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorTcpSocketSent` event to the publisher's subscriber
         fn on_acceptor_tcp_socket_sent(&self, event: builder::AcceptorTcpSocketSent);
-        #[doc = "Publishes a `AcceptorTcpSocketReceived` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorTcpSocketReceived` event to the publisher's subscriber
         fn on_acceptor_tcp_socket_received(&self, event: builder::AcceptorTcpSocketReceived);
-        #[doc = "Publishes a `AcceptorUdpStarted` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorUdpStarted` event to the publisher's subscriber
         fn on_acceptor_udp_started(&self, event: builder::AcceptorUdpStarted);
-        #[doc = "Publishes a `AcceptorUdpDatagramReceived` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorUdpDatagramReceived` event to the publisher's subscriber
         fn on_acceptor_udp_datagram_received(&self, event: builder::AcceptorUdpDatagramReceived);
-        #[doc = "Publishes a `AcceptorUdpPacketReceived` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorUdpPacketReceived` event to the publisher's subscriber
         fn on_acceptor_udp_packet_received(&self, event: builder::AcceptorUdpPacketReceived);
-        #[doc = "Publishes a `AcceptorUdpPacketDropped` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorUdpPacketDropped` event to the publisher's subscriber
         fn on_acceptor_udp_packet_dropped(&self, event: builder::AcceptorUdpPacketDropped);
-        #[doc = "Publishes a `AcceptorUdpStreamEnqueued` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorUdpStreamEnqueued` event to the publisher's subscriber
         fn on_acceptor_udp_stream_enqueued(&self, event: builder::AcceptorUdpStreamEnqueued);
-        #[doc = "Publishes a `AcceptorUdpIoError` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorUdpIoError` event to the publisher's subscriber
         fn on_acceptor_udp_io_error(&self, event: builder::AcceptorUdpIoError);
-        #[doc = "Publishes a `AcceptorStreamPruned` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorStreamPruned` event to the publisher's subscriber
         fn on_acceptor_stream_pruned(&self, event: builder::AcceptorStreamPruned);
-        #[doc = "Publishes a `AcceptorStreamDequeued` event to the publisher's subscriber"]
+        ///Publishes a `AcceptorStreamDequeued` event to the publisher's subscriber
         fn on_acceptor_stream_dequeued(&self, event: builder::AcceptorStreamDequeued);
-        #[doc = "Publishes a `StreamTcpConnect` event to the publisher's subscriber"]
+        ///Publishes a `StreamTcpConnect` event to the publisher's subscriber
         fn on_stream_tcp_connect(&self, event: builder::StreamTcpConnect);
-        #[doc = "Publishes a `StreamConnect` event to the publisher's subscriber"]
+        ///Publishes a `StreamTlsConnect` event to the publisher's subscriber
+        fn on_stream_tls_connect(&self, event: builder::StreamTlsConnect);
+        ///Publishes a `StreamTlsConnectError` event to the publisher's subscriber
+        fn on_stream_tls_connect_error(&self, event: builder::StreamTlsConnectError);
+        ///Publishes a `StreamConnect` event to the publisher's subscriber
         fn on_stream_connect(&self, event: builder::StreamConnect);
-        #[doc = "Publishes a `StreamConnectError` event to the publisher's subscriber"]
+        ///Publishes a `StreamConnectError` event to the publisher's subscriber
         fn on_stream_connect_error(&self, event: builder::StreamConnectError);
-        #[doc = "Publishes a `EndpointInitialized` event to the publisher's subscriber"]
+        ///Publishes a `EndpointInitialized` event to the publisher's subscriber
         fn on_endpoint_initialized(&self, event: builder::EndpointInitialized);
-        #[doc = "Publishes a `PathSecretMapInitialized` event to the publisher's subscriber"]
+        ///Publishes a `DcConnectionTimeout` event to the publisher's subscriber
+        fn on_dc_connection_timeout(&self, event: builder::DcConnectionTimeout);
+        ///Publishes a `PathSecretMapInitialized` event to the publisher's subscriber
         fn on_path_secret_map_initialized(&self, event: builder::PathSecretMapInitialized);
-        #[doc = "Publishes a `PathSecretMapUninitialized` event to the publisher's subscriber"]
+        ///Publishes a `PathSecretMapUninitialized` event to the publisher's subscriber
         fn on_path_secret_map_uninitialized(&self, event: builder::PathSecretMapUninitialized);
-        #[doc = "Publishes a `PathSecretMapBackgroundHandshakeRequested` event to the publisher's subscriber"]
+        ///Publishes a `PathSecretMapBackgroundHandshakeRequested` event to the publisher's subscriber
         fn on_path_secret_map_background_handshake_requested(
             &self,
             event: builder::PathSecretMapBackgroundHandshakeRequested,
         );
-        #[doc = "Publishes a `PathSecretMapEntryInserted` event to the publisher's subscriber"]
+        ///Publishes a `PathSecretMapEntryInserted` event to the publisher's subscriber
         fn on_path_secret_map_entry_inserted(&self, event: builder::PathSecretMapEntryInserted);
-        #[doc = "Publishes a `PathSecretMapEntryReady` event to the publisher's subscriber"]
+        ///Publishes a `PathSecretMapEntryReady` event to the publisher's subscriber
         fn on_path_secret_map_entry_ready(&self, event: builder::PathSecretMapEntryReady);
-        #[doc = "Publishes a `PathSecretMapEntryReplaced` event to the publisher's subscriber"]
+        ///Publishes a `PathSecretMapEntryReplaced` event to the publisher's subscriber
         fn on_path_secret_map_entry_replaced(&self, event: builder::PathSecretMapEntryReplaced);
-        #[doc = "Publishes a `PathSecretMapIdEntryEvicted` event to the publisher's subscriber"]
+        ///Publishes a `PathSecretMapIdEntryEvicted` event to the publisher's subscriber
         fn on_path_secret_map_id_entry_evicted(&self, event: builder::PathSecretMapIdEntryEvicted);
-        #[doc = "Publishes a `PathSecretMapAddressEntryEvicted` event to the publisher's subscriber"]
+        ///Publishes a `PathSecretMapAddressEntryEvicted` event to the publisher's subscriber
         fn on_path_secret_map_address_entry_evicted(
             &self,
             event: builder::PathSecretMapAddressEntryEvicted,
         );
-        #[doc = "Publishes a `UnknownPathSecretPacketSent` event to the publisher's subscriber"]
+        ///Publishes a `UnknownPathSecretPacketSent` event to the publisher's subscriber
         fn on_unknown_path_secret_packet_sent(&self, event: builder::UnknownPathSecretPacketSent);
-        #[doc = "Publishes a `UnknownPathSecretPacketReceived` event to the publisher's subscriber"]
+        ///Publishes a `UnknownPathSecretPacketReceived` event to the publisher's subscriber
         fn on_unknown_path_secret_packet_received(
             &self,
             event: builder::UnknownPathSecretPacketReceived,
         );
-        #[doc = "Publishes a `UnknownPathSecretPacketAccepted` event to the publisher's subscriber"]
+        ///Publishes a `UnknownPathSecretPacketAccepted` event to the publisher's subscriber
         fn on_unknown_path_secret_packet_accepted(
             &self,
             event: builder::UnknownPathSecretPacketAccepted,
         );
-        #[doc = "Publishes a `UnknownPathSecretPacketRejected` event to the publisher's subscriber"]
+        ///Publishes a `UnknownPathSecretPacketRejected` event to the publisher's subscriber
         fn on_unknown_path_secret_packet_rejected(
             &self,
             event: builder::UnknownPathSecretPacketRejected,
         );
-        #[doc = "Publishes a `UnknownPathSecretPacketDropped` event to the publisher's subscriber"]
+        ///Publishes a `UnknownPathSecretPacketDropped` event to the publisher's subscriber
         fn on_unknown_path_secret_packet_dropped(
             &self,
             event: builder::UnknownPathSecretPacketDropped,
         );
-        #[doc = "Publishes a `KeyAccepted` event to the publisher's subscriber"]
+        ///Publishes a `KeyAccepted` event to the publisher's subscriber
         fn on_key_accepted(&self, event: builder::KeyAccepted);
-        #[doc = "Publishes a `ReplayDefinitelyDetected` event to the publisher's subscriber"]
+        ///Publishes a `ReplayDefinitelyDetected` event to the publisher's subscriber
         fn on_replay_definitely_detected(&self, event: builder::ReplayDefinitelyDetected);
-        #[doc = "Publishes a `ReplayPotentiallyDetected` event to the publisher's subscriber"]
+        ///Publishes a `ReplayPotentiallyDetected` event to the publisher's subscriber
         fn on_replay_potentially_detected(&self, event: builder::ReplayPotentiallyDetected);
-        #[doc = "Publishes a `ReplayDetectedPacketSent` event to the publisher's subscriber"]
+        ///Publishes a `ReplayDetectedPacketSent` event to the publisher's subscriber
         fn on_replay_detected_packet_sent(&self, event: builder::ReplayDetectedPacketSent);
-        #[doc = "Publishes a `ReplayDetectedPacketReceived` event to the publisher's subscriber"]
+        ///Publishes a `ReplayDetectedPacketReceived` event to the publisher's subscriber
         fn on_replay_detected_packet_received(&self, event: builder::ReplayDetectedPacketReceived);
-        #[doc = "Publishes a `ReplayDetectedPacketAccepted` event to the publisher's subscriber"]
+        ///Publishes a `ReplayDetectedPacketAccepted` event to the publisher's subscriber
         fn on_replay_detected_packet_accepted(&self, event: builder::ReplayDetectedPacketAccepted);
-        #[doc = "Publishes a `ReplayDetectedPacketRejected` event to the publisher's subscriber"]
+        ///Publishes a `ReplayDetectedPacketRejected` event to the publisher's subscriber
         fn on_replay_detected_packet_rejected(&self, event: builder::ReplayDetectedPacketRejected);
-        #[doc = "Publishes a `ReplayDetectedPacketDropped` event to the publisher's subscriber"]
+        ///Publishes a `ReplayDetectedPacketDropped` event to the publisher's subscriber
         fn on_replay_detected_packet_dropped(&self, event: builder::ReplayDetectedPacketDropped);
-        #[doc = "Publishes a `StaleKeyPacketSent` event to the publisher's subscriber"]
+        ///Publishes a `StaleKeyPacketSent` event to the publisher's subscriber
         fn on_stale_key_packet_sent(&self, event: builder::StaleKeyPacketSent);
-        #[doc = "Publishes a `StaleKeyPacketReceived` event to the publisher's subscriber"]
+        ///Publishes a `StaleKeyPacketReceived` event to the publisher's subscriber
         fn on_stale_key_packet_received(&self, event: builder::StaleKeyPacketReceived);
-        #[doc = "Publishes a `StaleKeyPacketAccepted` event to the publisher's subscriber"]
+        ///Publishes a `StaleKeyPacketAccepted` event to the publisher's subscriber
         fn on_stale_key_packet_accepted(&self, event: builder::StaleKeyPacketAccepted);
-        #[doc = "Publishes a `StaleKeyPacketRejected` event to the publisher's subscriber"]
+        ///Publishes a `StaleKeyPacketRejected` event to the publisher's subscriber
         fn on_stale_key_packet_rejected(&self, event: builder::StaleKeyPacketRejected);
-        #[doc = "Publishes a `StaleKeyPacketDropped` event to the publisher's subscriber"]
+        ///Publishes a `StaleKeyPacketDropped` event to the publisher's subscriber
         fn on_stale_key_packet_dropped(&self, event: builder::StaleKeyPacketDropped);
-        #[doc = "Publishes a `PathSecretMapAddressCacheAccessed` event to the publisher's subscriber"]
+        ///Publishes a `PathSecretMapAddressCacheAccessed` event to the publisher's subscriber
         fn on_path_secret_map_address_cache_accessed(
             &self,
             event: builder::PathSecretMapAddressCacheAccessed,
         );
-        #[doc = "Publishes a `PathSecretMapAddressCacheAccessedHit` event to the publisher's subscriber"]
+        ///Publishes a `PathSecretMapAddressCacheAccessedHit` event to the publisher's subscriber
         fn on_path_secret_map_address_cache_accessed_hit(
             &self,
             event: builder::PathSecretMapAddressCacheAccessedHit,
         );
-        #[doc = "Publishes a `PathSecretMapIdCacheAccessed` event to the publisher's subscriber"]
+        ///Publishes a `PathSecretMapIdCacheAccessed` event to the publisher's subscriber
         fn on_path_secret_map_id_cache_accessed(
             &self,
             event: builder::PathSecretMapIdCacheAccessed,
         );
-        #[doc = "Publishes a `PathSecretMapIdCacheAccessedHit` event to the publisher's subscriber"]
+        ///Publishes a `PathSecretMapIdCacheAccessedHit` event to the publisher's subscriber
         fn on_path_secret_map_id_cache_accessed_hit(
             &self,
             event: builder::PathSecretMapIdCacheAccessedHit,
         );
-        #[doc = "Publishes a `PathSecretMapCleanerCycled` event to the publisher's subscriber"]
+        ///Publishes a `PathSecretMapCleanerCycled` event to the publisher's subscriber
         fn on_path_secret_map_cleaner_cycled(&self, event: builder::PathSecretMapCleanerCycled);
-        #[doc = "Publishes a `PathSecretMapIdWriteLock` event to the publisher's subscriber"]
+        ///Publishes a `PathSecretMapSerialized` event to the publisher's subscriber
+        fn on_path_secret_map_serialized(&self, event: builder::PathSecretMapSerialized);
+        ///Publishes a `PathSecretMapIdWriteLock` event to the publisher's subscriber
         fn on_path_secret_map_id_write_lock(&self, event: builder::PathSecretMapIdWriteLock);
-        #[doc = "Publishes a `PathSecretMapAddressWriteLock` event to the publisher's subscriber"]
+        ///Publishes a `PathSecretMapAddressWriteLock` event to the publisher's subscriber
         fn on_path_secret_map_address_write_lock(
             &self,
             event: builder::PathSecretMapAddressWriteLock,
         );
-        #[doc = r" Returns the QUIC version, if any"]
+        ///Publishes a `PathSecretMapDatagramEncrypt` event to the publisher's subscriber
+        fn on_path_secret_map_datagram_encrypt(&self, event: builder::PathSecretMapDatagramEncrypt);
+        ///Publishes a `PathSecretMapDatagramDecrypt` event to the publisher's subscriber
+        fn on_path_secret_map_datagram_decrypt(&self, event: builder::PathSecretMapDatagramDecrypt);
+        /// Returns the QUIC version, if any
         fn quic_version(&self) -> Option<u32>;
     }
     pub struct EndpointPublisherSubscriber<'a, Sub: Subscriber> {
@@ -8654,6 +10505,43 @@ mod traits {
             let event = event.into_event();
             self.subscriber
                 .on_acceptor_tcp_packet_received(&self.meta, &event);
+            self.subscriber.on_event(&self.meta, &event);
+        }
+        #[inline]
+        fn on_acceptor_tcp_tls_started(&self, event: builder::AcceptorTcpTlsStarted) {
+            let event = event.into_event();
+            self.subscriber
+                .on_acceptor_tcp_tls_started(&self.meta, &event);
+            self.subscriber.on_event(&self.meta, &event);
+        }
+        #[inline]
+        fn on_acceptor_tcp_tls_stream_enqueued(
+            &self,
+            event: builder::AcceptorTcpTlsStreamEnqueued,
+        ) {
+            let event = event.into_event();
+            self.subscriber
+                .on_acceptor_tcp_tls_stream_enqueued(&self.meta, &event);
+            self.subscriber.on_event(&self.meta, &event);
+        }
+        #[inline]
+        fn on_acceptor_tcp_tls_stream_rejected(
+            &self,
+            event: builder::AcceptorTcpTlsStreamRejected,
+        ) {
+            let event = event.into_event();
+            self.subscriber
+                .on_acceptor_tcp_tls_stream_rejected(&self.meta, &event);
+            self.subscriber.on_event(&self.meta, &event);
+        }
+        #[inline]
+        fn on_acceptor_tcp_synthetic_tls_stream_rejected(
+            &self,
+            event: builder::AcceptorTcpSyntheticTlsStreamRejected,
+        ) {
+            let event = event.into_event();
+            self.subscriber
+                .on_acceptor_tcp_synthetic_tls_stream_rejected(&self.meta, &event);
             self.subscriber.on_event(&self.meta, &event);
         }
         #[inline]
@@ -8751,6 +10639,19 @@ mod traits {
             self.subscriber.on_event(&self.meta, &event);
         }
         #[inline]
+        fn on_stream_tls_connect(&self, event: builder::StreamTlsConnect) {
+            let event = event.into_event();
+            self.subscriber.on_stream_tls_connect(&self.meta, &event);
+            self.subscriber.on_event(&self.meta, &event);
+        }
+        #[inline]
+        fn on_stream_tls_connect_error(&self, event: builder::StreamTlsConnectError) {
+            let event = event.into_event();
+            self.subscriber
+                .on_stream_tls_connect_error(&self.meta, &event);
+            self.subscriber.on_event(&self.meta, &event);
+        }
+        #[inline]
         fn on_stream_connect(&self, event: builder::StreamConnect) {
             let event = event.into_event();
             self.subscriber.on_stream_connect(&self.meta, &event);
@@ -8766,6 +10667,12 @@ mod traits {
         fn on_endpoint_initialized(&self, event: builder::EndpointInitialized) {
             let event = event.into_event();
             self.subscriber.on_endpoint_initialized(&self.meta, &event);
+            self.subscriber.on_event(&self.meta, &event);
+        }
+        #[inline]
+        fn on_dc_connection_timeout(&self, event: builder::DcConnectionTimeout) {
+            let event = event.into_event();
+            self.subscriber.on_dc_connection_timeout(&self.meta, &event);
             self.subscriber.on_event(&self.meta, &event);
         }
         #[inline]
@@ -9014,6 +10921,13 @@ mod traits {
             self.subscriber.on_event(&self.meta, &event);
         }
         #[inline]
+        fn on_path_secret_map_serialized(&self, event: builder::PathSecretMapSerialized) {
+            let event = event.into_event();
+            self.subscriber
+                .on_path_secret_map_serialized(&self.meta, &event);
+            self.subscriber.on_event(&self.meta, &event);
+        }
+        #[inline]
         fn on_path_secret_map_id_write_lock(&self, event: builder::PathSecretMapIdWriteLock) {
             let event = event.into_event();
             self.subscriber
@@ -9031,84 +10945,109 @@ mod traits {
             self.subscriber.on_event(&self.meta, &event);
         }
         #[inline]
+        fn on_path_secret_map_datagram_encrypt(
+            &self,
+            event: builder::PathSecretMapDatagramEncrypt,
+        ) {
+            let event = event.into_event();
+            self.subscriber
+                .on_path_secret_map_datagram_encrypt(&self.meta, &event);
+            self.subscriber.on_event(&self.meta, &event);
+        }
+        #[inline]
+        fn on_path_secret_map_datagram_decrypt(
+            &self,
+            event: builder::PathSecretMapDatagramDecrypt,
+        ) {
+            let event = event.into_event();
+            self.subscriber
+                .on_path_secret_map_datagram_decrypt(&self.meta, &event);
+            self.subscriber.on_event(&self.meta, &event);
+        }
+        #[inline]
         fn quic_version(&self) -> Option<u32> {
             self.quic_version
         }
     }
     pub trait ConnectionPublisher {
-        #[doc = "Publishes a `StreamWriteFlushed` event to the publisher's subscriber"]
+        ///Publishes a `StreamWriteFlushed` event to the publisher's subscriber
         fn on_stream_write_flushed(&self, event: builder::StreamWriteFlushed);
-        #[doc = "Publishes a `StreamWriteFinFlushed` event to the publisher's subscriber"]
+        ///Publishes a `StreamWriteFinFlushed` event to the publisher's subscriber
         fn on_stream_write_fin_flushed(&self, event: builder::StreamWriteFinFlushed);
-        #[doc = "Publishes a `StreamWriteBlocked` event to the publisher's subscriber"]
+        ///Publishes a `StreamWriteBlocked` event to the publisher's subscriber
         fn on_stream_write_blocked(&self, event: builder::StreamWriteBlocked);
-        #[doc = "Publishes a `StreamWriteErrored` event to the publisher's subscriber"]
+        ///Publishes a `StreamWriteErrored` event to the publisher's subscriber
         fn on_stream_write_errored(&self, event: builder::StreamWriteErrored);
-        #[doc = "Publishes a `StreamWriteKeyUpdated` event to the publisher's subscriber"]
+        ///Publishes a `StreamWriteKeyUpdated` event to the publisher's subscriber
         fn on_stream_write_key_updated(&self, event: builder::StreamWriteKeyUpdated);
-        #[doc = "Publishes a `StreamWriteAllocated` event to the publisher's subscriber"]
+        ///Publishes a `StreamWriteAllocated` event to the publisher's subscriber
         fn on_stream_write_allocated(&self, event: builder::StreamWriteAllocated);
-        #[doc = "Publishes a `StreamWriteShutdown` event to the publisher's subscriber"]
+        ///Publishes a `StreamWriteShutdown` event to the publisher's subscriber
         fn on_stream_write_shutdown(&self, event: builder::StreamWriteShutdown);
-        #[doc = "Publishes a `StreamWriteSocketFlushed` event to the publisher's subscriber"]
+        ///Publishes a `StreamWriteSocketFlushed` event to the publisher's subscriber
         fn on_stream_write_socket_flushed(&self, event: builder::StreamWriteSocketFlushed);
-        #[doc = "Publishes a `StreamWriteSocketBlocked` event to the publisher's subscriber"]
+        ///Publishes a `StreamWriteSocketBlocked` event to the publisher's subscriber
         fn on_stream_write_socket_blocked(&self, event: builder::StreamWriteSocketBlocked);
-        #[doc = "Publishes a `StreamWriteSocketErrored` event to the publisher's subscriber"]
+        ///Publishes a `StreamWriteSocketErrored` event to the publisher's subscriber
         fn on_stream_write_socket_errored(&self, event: builder::StreamWriteSocketErrored);
-        #[doc = "Publishes a `StreamReadFlushed` event to the publisher's subscriber"]
+        ///Publishes a `StreamReadFlushed` event to the publisher's subscriber
         fn on_stream_read_flushed(&self, event: builder::StreamReadFlushed);
-        #[doc = "Publishes a `StreamReadFinFlushed` event to the publisher's subscriber"]
+        ///Publishes a `StreamReadFinFlushed` event to the publisher's subscriber
         fn on_stream_read_fin_flushed(&self, event: builder::StreamReadFinFlushed);
-        #[doc = "Publishes a `StreamReadBlocked` event to the publisher's subscriber"]
+        ///Publishes a `StreamReadBlocked` event to the publisher's subscriber
         fn on_stream_read_blocked(&self, event: builder::StreamReadBlocked);
-        #[doc = "Publishes a `StreamReadErrored` event to the publisher's subscriber"]
+        ///Publishes a `StreamReadErrored` event to the publisher's subscriber
         fn on_stream_read_errored(&self, event: builder::StreamReadErrored);
-        #[doc = "Publishes a `StreamReadKeyUpdated` event to the publisher's subscriber"]
+        ///Publishes a `StreamReadKeyUpdated` event to the publisher's subscriber
         fn on_stream_read_key_updated(&self, event: builder::StreamReadKeyUpdated);
-        #[doc = "Publishes a `StreamReadShutdown` event to the publisher's subscriber"]
+        ///Publishes a `StreamReadShutdown` event to the publisher's subscriber
         fn on_stream_read_shutdown(&self, event: builder::StreamReadShutdown);
-        #[doc = "Publishes a `StreamReadSocketFlushed` event to the publisher's subscriber"]
+        ///Publishes a `StreamReadSocketFlushed` event to the publisher's subscriber
         fn on_stream_read_socket_flushed(&self, event: builder::StreamReadSocketFlushed);
-        #[doc = "Publishes a `StreamReadSocketBlocked` event to the publisher's subscriber"]
+        ///Publishes a `StreamReadSocketBlocked` event to the publisher's subscriber
         fn on_stream_read_socket_blocked(&self, event: builder::StreamReadSocketBlocked);
-        #[doc = "Publishes a `StreamReadSocketErrored` event to the publisher's subscriber"]
+        ///Publishes a `StreamReadSocketErrored` event to the publisher's subscriber
         fn on_stream_read_socket_errored(&self, event: builder::StreamReadSocketErrored);
-        #[doc = "Publishes a `StreamDecryptPacket` event to the publisher's subscriber"]
+        ///Publishes a `StreamDecryptPacket` event to the publisher's subscriber
         fn on_stream_decrypt_packet(&self, event: builder::StreamDecryptPacket);
-        #[doc = "Publishes a `StreamPacketTransmitted` event to the publisher's subscriber"]
+        ///Publishes a `StreamPacketTransmitted` event to the publisher's subscriber
         fn on_stream_packet_transmitted(&self, event: builder::StreamPacketTransmitted);
-        #[doc = "Publishes a `StreamProbeTransmitted` event to the publisher's subscriber"]
+        ///Publishes a `StreamProbeTransmitted` event to the publisher's subscriber
         fn on_stream_probe_transmitted(&self, event: builder::StreamProbeTransmitted);
-        #[doc = "Publishes a `StreamPacketReceived` event to the publisher's subscriber"]
+        ///Publishes a `StreamPacketReceived` event to the publisher's subscriber
         fn on_stream_packet_received(&self, event: builder::StreamPacketReceived);
-        #[doc = "Publishes a `StreamPacketLost` event to the publisher's subscriber"]
+        ///Publishes a `StreamPacketLost` event to the publisher's subscriber
         fn on_stream_packet_lost(&self, event: builder::StreamPacketLost);
-        #[doc = "Publishes a `StreamPacketAcked` event to the publisher's subscriber"]
+        ///Publishes a `StreamPacketAcked` event to the publisher's subscriber
         fn on_stream_packet_acked(&self, event: builder::StreamPacketAcked);
-        #[doc = "Publishes a `StreamPacketSpuriouslyRetransmitted` event to the publisher's subscriber"]
+        ///Publishes a `StreamPacketSpuriouslyRetransmitted` event to the publisher's subscriber
         fn on_stream_packet_spuriously_retransmitted(
             &self,
             event: builder::StreamPacketSpuriouslyRetransmitted,
         );
-        #[doc = "Publishes a `StreamMaxDataReceived` event to the publisher's subscriber"]
+        ///Publishes a `StreamMaxDataReceived` event to the publisher's subscriber
         fn on_stream_max_data_received(&self, event: builder::StreamMaxDataReceived);
-        #[doc = "Publishes a `StreamControlPacketTransmitted` event to the publisher's subscriber"]
+        ///Publishes a `StreamControlPacketTransmitted` event to the publisher's subscriber
         fn on_stream_control_packet_transmitted(
             &self,
             event: builder::StreamControlPacketTransmitted,
         );
-        #[doc = "Publishes a `StreamControlPacketReceived` event to the publisher's subscriber"]
+        ///Publishes a `StreamControlPacketReceived` event to the publisher's subscriber
         fn on_stream_control_packet_received(&self, event: builder::StreamControlPacketReceived);
-        #[doc = "Publishes a `StreamReceiverErrored` event to the publisher's subscriber"]
+        ///Publishes a `StreamReceiverErrored` event to the publisher's subscriber
         fn on_stream_receiver_errored(&self, event: builder::StreamReceiverErrored);
-        #[doc = "Publishes a `StreamSenderErrored` event to the publisher's subscriber"]
+        ///Publishes a `StreamSenderErrored` event to the publisher's subscriber
         fn on_stream_sender_errored(&self, event: builder::StreamSenderErrored);
-        #[doc = "Publishes a `ConnectionClosed` event to the publisher's subscriber"]
+        ///Publishes a `StreamHandshakePacketRejected` event to the publisher's subscriber
+        fn on_stream_handshake_packet_rejected(
+            &self,
+            event: builder::StreamHandshakePacketRejected,
+        );
+        ///Publishes a `ConnectionClosed` event to the publisher's subscriber
         fn on_connection_closed(&self, event: builder::ConnectionClosed);
-        #[doc = r" Returns the QUIC version negotiated for the current connection, if any"]
+        /// Returns the QUIC version negotiated for the current connection, if any
         fn quic_version(&self) -> u32;
-        #[doc = r" Returns the [`Subject`] for the current publisher"]
+        /// Returns the [`Subject`] for the current publisher
         fn subject(&self) -> api::Subject;
     }
     pub struct ConnectionPublisherSubscriber<'a, Sub: Subscriber> {
@@ -9431,6 +11370,18 @@ mod traits {
             self.subscriber.on_event(&self.meta, &event);
         }
         #[inline]
+        fn on_stream_handshake_packet_rejected(
+            &self,
+            event: builder::StreamHandshakePacketRejected,
+        ) {
+            let event = event.into_event();
+            self.subscriber
+                .on_stream_handshake_packet_rejected(self.context, &self.meta, &event);
+            self.subscriber
+                .on_connection_event(self.context, &self.meta, &event);
+            self.subscriber.on_event(&self.meta, &event);
+        }
+        #[inline]
         fn on_connection_closed(&self, event: builder::ConnectionClosed) {
             let event = event.into_event();
             self.subscriber
@@ -9467,6 +11418,10 @@ pub mod testing {
             pub acceptor_tcp_stream_dropped: AtomicU64,
             pub acceptor_tcp_stream_replaced: AtomicU64,
             pub acceptor_tcp_packet_received: AtomicU64,
+            pub acceptor_tcp_tls_started: AtomicU64,
+            pub acceptor_tcp_tls_stream_enqueued: AtomicU64,
+            pub acceptor_tcp_tls_stream_rejected: AtomicU64,
+            pub acceptor_tcp_synthetic_tls_stream_rejected: AtomicU64,
             pub acceptor_tcp_packet_dropped: AtomicU64,
             pub acceptor_tcp_stream_enqueued: AtomicU64,
             pub acceptor_tcp_io_error: AtomicU64,
@@ -9481,9 +11436,12 @@ pub mod testing {
             pub acceptor_stream_pruned: AtomicU64,
             pub acceptor_stream_dequeued: AtomicU64,
             pub stream_tcp_connect: AtomicU64,
+            pub stream_tls_connect: AtomicU64,
+            pub stream_tls_connect_error: AtomicU64,
             pub stream_connect: AtomicU64,
             pub stream_connect_error: AtomicU64,
             pub endpoint_initialized: AtomicU64,
+            pub dc_connection_timeout: AtomicU64,
             pub path_secret_map_initialized: AtomicU64,
             pub path_secret_map_uninitialized: AtomicU64,
             pub path_secret_map_background_handshake_requested: AtomicU64,
@@ -9515,8 +11473,11 @@ pub mod testing {
             pub path_secret_map_id_cache_accessed: AtomicU64,
             pub path_secret_map_id_cache_accessed_hit: AtomicU64,
             pub path_secret_map_cleaner_cycled: AtomicU64,
+            pub path_secret_map_serialized: AtomicU64,
             pub path_secret_map_id_write_lock: AtomicU64,
             pub path_secret_map_address_write_lock: AtomicU64,
+            pub path_secret_map_datagram_encrypt: AtomicU64,
+            pub path_secret_map_datagram_decrypt: AtomicU64,
         }
         impl Drop for Subscriber {
             fn drop(&mut self) {
@@ -9529,21 +11490,21 @@ pub mod testing {
             }
         }
         impl Subscriber {
-            #[doc = r" Creates a subscriber with snapshot assertions enabled"]
+            /// Creates a subscriber with snapshot assertions enabled
             #[track_caller]
             pub fn snapshot() -> Self {
                 let mut sub = Self::no_snapshot();
                 sub.location = Location::from_thread_name();
                 sub
             }
-            #[doc = r" Creates a subscriber with snapshot assertions enabled"]
+            /// Creates a subscriber with snapshot assertions enabled
             #[track_caller]
             pub fn named_snapshot<Name: core::fmt::Display>(name: Name) -> Self {
                 let mut sub = Self::no_snapshot();
                 sub.location = Some(Location::new(name));
                 sub
             }
-            #[doc = r" Creates a subscriber with snapshot assertions disabled"]
+            /// Creates a subscriber with snapshot assertions disabled
             pub fn no_snapshot() -> Self {
                 Self {
                     location: None,
@@ -9555,6 +11516,10 @@ pub mod testing {
                     acceptor_tcp_stream_dropped: AtomicU64::new(0),
                     acceptor_tcp_stream_replaced: AtomicU64::new(0),
                     acceptor_tcp_packet_received: AtomicU64::new(0),
+                    acceptor_tcp_tls_started: AtomicU64::new(0),
+                    acceptor_tcp_tls_stream_enqueued: AtomicU64::new(0),
+                    acceptor_tcp_tls_stream_rejected: AtomicU64::new(0),
+                    acceptor_tcp_synthetic_tls_stream_rejected: AtomicU64::new(0),
                     acceptor_tcp_packet_dropped: AtomicU64::new(0),
                     acceptor_tcp_stream_enqueued: AtomicU64::new(0),
                     acceptor_tcp_io_error: AtomicU64::new(0),
@@ -9569,9 +11534,12 @@ pub mod testing {
                     acceptor_stream_pruned: AtomicU64::new(0),
                     acceptor_stream_dequeued: AtomicU64::new(0),
                     stream_tcp_connect: AtomicU64::new(0),
+                    stream_tls_connect: AtomicU64::new(0),
+                    stream_tls_connect_error: AtomicU64::new(0),
                     stream_connect: AtomicU64::new(0),
                     stream_connect_error: AtomicU64::new(0),
                     endpoint_initialized: AtomicU64::new(0),
+                    dc_connection_timeout: AtomicU64::new(0),
                     path_secret_map_initialized: AtomicU64::new(0),
                     path_secret_map_uninitialized: AtomicU64::new(0),
                     path_secret_map_background_handshake_requested: AtomicU64::new(0),
@@ -9603,8 +11571,11 @@ pub mod testing {
                     path_secret_map_id_cache_accessed: AtomicU64::new(0),
                     path_secret_map_id_cache_accessed_hit: AtomicU64::new(0),
                     path_secret_map_cleaner_cycled: AtomicU64::new(0),
+                    path_secret_map_serialized: AtomicU64::new(0),
                     path_secret_map_id_write_lock: AtomicU64::new(0),
                     path_secret_map_address_write_lock: AtomicU64::new(0),
+                    path_secret_map_datagram_encrypt: AtomicU64::new(0),
+                    path_secret_map_datagram_decrypt: AtomicU64::new(0),
                 }
             }
         }
@@ -9693,6 +11664,54 @@ pub mod testing {
                 event: &api::AcceptorTcpPacketReceived,
             ) {
                 self.acceptor_tcp_packet_received
+                    .fetch_add(1, Ordering::Relaxed);
+                let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+                let event = crate::event::snapshot::Fmt::to_snapshot(event);
+                let out = format!("{meta:?} {event:?}");
+                self.output.lock().unwrap().push(out);
+            }
+            fn on_acceptor_tcp_tls_started(
+                &self,
+                meta: &api::EndpointMeta,
+                event: &api::AcceptorTcpTlsStarted,
+            ) {
+                self.acceptor_tcp_tls_started
+                    .fetch_add(1, Ordering::Relaxed);
+                let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+                let event = crate::event::snapshot::Fmt::to_snapshot(event);
+                let out = format!("{meta:?} {event:?}");
+                self.output.lock().unwrap().push(out);
+            }
+            fn on_acceptor_tcp_tls_stream_enqueued(
+                &self,
+                meta: &api::EndpointMeta,
+                event: &api::AcceptorTcpTlsStreamEnqueued,
+            ) {
+                self.acceptor_tcp_tls_stream_enqueued
+                    .fetch_add(1, Ordering::Relaxed);
+                let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+                let event = crate::event::snapshot::Fmt::to_snapshot(event);
+                let out = format!("{meta:?} {event:?}");
+                self.output.lock().unwrap().push(out);
+            }
+            fn on_acceptor_tcp_tls_stream_rejected(
+                &self,
+                meta: &api::EndpointMeta,
+                event: &api::AcceptorTcpTlsStreamRejected,
+            ) {
+                self.acceptor_tcp_tls_stream_rejected
+                    .fetch_add(1, Ordering::Relaxed);
+                let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+                let event = crate::event::snapshot::Fmt::to_snapshot(event);
+                let out = format!("{meta:?} {event:?}");
+                self.output.lock().unwrap().push(out);
+            }
+            fn on_acceptor_tcp_synthetic_tls_stream_rejected(
+                &self,
+                meta: &api::EndpointMeta,
+                event: &api::AcceptorTcpSyntheticTlsStreamRejected,
+            ) {
+                self.acceptor_tcp_synthetic_tls_stream_rejected
                     .fetch_add(1, Ordering::Relaxed);
                 let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
                 let event = crate::event::snapshot::Fmt::to_snapshot(event);
@@ -9862,6 +11881,29 @@ pub mod testing {
                 let out = format!("{meta:?} {event:?}");
                 self.output.lock().unwrap().push(out);
             }
+            fn on_stream_tls_connect(
+                &self,
+                meta: &api::EndpointMeta,
+                event: &api::StreamTlsConnect,
+            ) {
+                self.stream_tls_connect.fetch_add(1, Ordering::Relaxed);
+                let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+                let event = crate::event::snapshot::Fmt::to_snapshot(event);
+                let out = format!("{meta:?} {event:?}");
+                self.output.lock().unwrap().push(out);
+            }
+            fn on_stream_tls_connect_error(
+                &self,
+                meta: &api::EndpointMeta,
+                event: &api::StreamTlsConnectError,
+            ) {
+                self.stream_tls_connect_error
+                    .fetch_add(1, Ordering::Relaxed);
+                let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+                let event = crate::event::snapshot::Fmt::to_snapshot(event);
+                let out = format!("{meta:?} {event:?}");
+                self.output.lock().unwrap().push(out);
+            }
             fn on_stream_connect(&self, meta: &api::EndpointMeta, event: &api::StreamConnect) {
                 self.stream_connect.fetch_add(1, Ordering::Relaxed);
                 let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
@@ -9886,6 +11928,17 @@ pub mod testing {
                 event: &api::EndpointInitialized,
             ) {
                 self.endpoint_initialized.fetch_add(1, Ordering::Relaxed);
+                let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+                let event = crate::event::snapshot::Fmt::to_snapshot(event);
+                let out = format!("{meta:?} {event:?}");
+                self.output.lock().unwrap().push(out);
+            }
+            fn on_dc_connection_timeout(
+                &self,
+                meta: &api::EndpointMeta,
+                event: &api::DcConnectionTimeout,
+            ) {
+                self.dc_connection_timeout.fetch_add(1, Ordering::Relaxed);
                 let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
                 let event = crate::event::snapshot::Fmt::to_snapshot(event);
                 let out = format!("{meta:?} {event:?}");
@@ -10257,6 +12310,18 @@ pub mod testing {
                 let out = format!("{meta:?} {event:?}");
                 self.output.lock().unwrap().push(out);
             }
+            fn on_path_secret_map_serialized(
+                &self,
+                meta: &api::EndpointMeta,
+                event: &api::PathSecretMapSerialized,
+            ) {
+                self.path_secret_map_serialized
+                    .fetch_add(1, Ordering::Relaxed);
+                let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+                let event = crate::event::snapshot::Fmt::to_snapshot(event);
+                let out = format!("{meta:?} {event:?}");
+                self.output.lock().unwrap().push(out);
+            }
             fn on_path_secret_map_id_write_lock(
                 &self,
                 meta: &api::EndpointMeta,
@@ -10281,6 +12346,30 @@ pub mod testing {
                 let out = format!("{meta:?} {event:?}");
                 self.output.lock().unwrap().push(out);
             }
+            fn on_path_secret_map_datagram_encrypt(
+                &self,
+                meta: &api::EndpointMeta,
+                event: &api::PathSecretMapDatagramEncrypt,
+            ) {
+                self.path_secret_map_datagram_encrypt
+                    .fetch_add(1, Ordering::Relaxed);
+                let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+                let event = crate::event::snapshot::Fmt::to_snapshot(event);
+                let out = format!("{meta:?} {event:?}");
+                self.output.lock().unwrap().push(out);
+            }
+            fn on_path_secret_map_datagram_decrypt(
+                &self,
+                meta: &api::EndpointMeta,
+                event: &api::PathSecretMapDatagramDecrypt,
+            ) {
+                self.path_secret_map_datagram_decrypt
+                    .fetch_add(1, Ordering::Relaxed);
+                let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+                let event = crate::event::snapshot::Fmt::to_snapshot(event);
+                let out = format!("{meta:?} {event:?}");
+                self.output.lock().unwrap().push(out);
+            }
         }
     }
     #[derive(Debug)]
@@ -10294,6 +12383,10 @@ pub mod testing {
         pub acceptor_tcp_stream_dropped: AtomicU64,
         pub acceptor_tcp_stream_replaced: AtomicU64,
         pub acceptor_tcp_packet_received: AtomicU64,
+        pub acceptor_tcp_tls_started: AtomicU64,
+        pub acceptor_tcp_tls_stream_enqueued: AtomicU64,
+        pub acceptor_tcp_tls_stream_rejected: AtomicU64,
+        pub acceptor_tcp_synthetic_tls_stream_rejected: AtomicU64,
         pub acceptor_tcp_packet_dropped: AtomicU64,
         pub acceptor_tcp_stream_enqueued: AtomicU64,
         pub acceptor_tcp_io_error: AtomicU64,
@@ -10328,6 +12421,8 @@ pub mod testing {
         pub stream_read_socket_errored: AtomicU64,
         pub stream_decrypt_packet: AtomicU64,
         pub stream_tcp_connect: AtomicU64,
+        pub stream_tls_connect: AtomicU64,
+        pub stream_tls_connect_error: AtomicU64,
         pub stream_connect: AtomicU64,
         pub stream_connect_error: AtomicU64,
         pub stream_packet_transmitted: AtomicU64,
@@ -10341,8 +12436,10 @@ pub mod testing {
         pub stream_control_packet_received: AtomicU64,
         pub stream_receiver_errored: AtomicU64,
         pub stream_sender_errored: AtomicU64,
+        pub stream_handshake_packet_rejected: AtomicU64,
         pub connection_closed: AtomicU64,
         pub endpoint_initialized: AtomicU64,
+        pub dc_connection_timeout: AtomicU64,
         pub path_secret_map_initialized: AtomicU64,
         pub path_secret_map_uninitialized: AtomicU64,
         pub path_secret_map_background_handshake_requested: AtomicU64,
@@ -10374,8 +12471,11 @@ pub mod testing {
         pub path_secret_map_id_cache_accessed: AtomicU64,
         pub path_secret_map_id_cache_accessed_hit: AtomicU64,
         pub path_secret_map_cleaner_cycled: AtomicU64,
+        pub path_secret_map_serialized: AtomicU64,
         pub path_secret_map_id_write_lock: AtomicU64,
         pub path_secret_map_address_write_lock: AtomicU64,
+        pub path_secret_map_datagram_encrypt: AtomicU64,
+        pub path_secret_map_datagram_decrypt: AtomicU64,
     }
     impl Drop for Subscriber {
         fn drop(&mut self) {
@@ -10388,21 +12488,21 @@ pub mod testing {
         }
     }
     impl Subscriber {
-        #[doc = r" Creates a subscriber with snapshot assertions enabled"]
+        /// Creates a subscriber with snapshot assertions enabled
         #[track_caller]
         pub fn snapshot() -> Self {
             let mut sub = Self::no_snapshot();
             sub.location = Location::from_thread_name();
             sub
         }
-        #[doc = r" Creates a subscriber with snapshot assertions enabled"]
+        /// Creates a subscriber with snapshot assertions enabled
         #[track_caller]
         pub fn named_snapshot<Name: core::fmt::Display>(name: Name) -> Self {
             let mut sub = Self::no_snapshot();
             sub.location = Some(Location::new(name));
             sub
         }
-        #[doc = r" Creates a subscriber with snapshot assertions disabled"]
+        /// Creates a subscriber with snapshot assertions disabled
         pub fn no_snapshot() -> Self {
             Self {
                 location: None,
@@ -10414,6 +12514,10 @@ pub mod testing {
                 acceptor_tcp_stream_dropped: AtomicU64::new(0),
                 acceptor_tcp_stream_replaced: AtomicU64::new(0),
                 acceptor_tcp_packet_received: AtomicU64::new(0),
+                acceptor_tcp_tls_started: AtomicU64::new(0),
+                acceptor_tcp_tls_stream_enqueued: AtomicU64::new(0),
+                acceptor_tcp_tls_stream_rejected: AtomicU64::new(0),
+                acceptor_tcp_synthetic_tls_stream_rejected: AtomicU64::new(0),
                 acceptor_tcp_packet_dropped: AtomicU64::new(0),
                 acceptor_tcp_stream_enqueued: AtomicU64::new(0),
                 acceptor_tcp_io_error: AtomicU64::new(0),
@@ -10448,6 +12552,8 @@ pub mod testing {
                 stream_read_socket_errored: AtomicU64::new(0),
                 stream_decrypt_packet: AtomicU64::new(0),
                 stream_tcp_connect: AtomicU64::new(0),
+                stream_tls_connect: AtomicU64::new(0),
+                stream_tls_connect_error: AtomicU64::new(0),
                 stream_connect: AtomicU64::new(0),
                 stream_connect_error: AtomicU64::new(0),
                 stream_packet_transmitted: AtomicU64::new(0),
@@ -10461,8 +12567,10 @@ pub mod testing {
                 stream_control_packet_received: AtomicU64::new(0),
                 stream_receiver_errored: AtomicU64::new(0),
                 stream_sender_errored: AtomicU64::new(0),
+                stream_handshake_packet_rejected: AtomicU64::new(0),
                 connection_closed: AtomicU64::new(0),
                 endpoint_initialized: AtomicU64::new(0),
+                dc_connection_timeout: AtomicU64::new(0),
                 path_secret_map_initialized: AtomicU64::new(0),
                 path_secret_map_uninitialized: AtomicU64::new(0),
                 path_secret_map_background_handshake_requested: AtomicU64::new(0),
@@ -10494,8 +12602,11 @@ pub mod testing {
                 path_secret_map_id_cache_accessed: AtomicU64::new(0),
                 path_secret_map_id_cache_accessed_hit: AtomicU64::new(0),
                 path_secret_map_cleaner_cycled: AtomicU64::new(0),
+                path_secret_map_serialized: AtomicU64::new(0),
                 path_secret_map_id_write_lock: AtomicU64::new(0),
                 path_secret_map_address_write_lock: AtomicU64::new(0),
+                path_secret_map_datagram_encrypt: AtomicU64::new(0),
+                path_secret_map_datagram_decrypt: AtomicU64::new(0),
             }
         }
     }
@@ -10584,6 +12695,54 @@ pub mod testing {
             event: &api::AcceptorTcpPacketReceived,
         ) {
             self.acceptor_tcp_packet_received
+                .fetch_add(1, Ordering::Relaxed);
+            let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+            let event = crate::event::snapshot::Fmt::to_snapshot(event);
+            let out = format!("{meta:?} {event:?}");
+            self.output.lock().unwrap().push(out);
+        }
+        fn on_acceptor_tcp_tls_started(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpTlsStarted,
+        ) {
+            self.acceptor_tcp_tls_started
+                .fetch_add(1, Ordering::Relaxed);
+            let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+            let event = crate::event::snapshot::Fmt::to_snapshot(event);
+            let out = format!("{meta:?} {event:?}");
+            self.output.lock().unwrap().push(out);
+        }
+        fn on_acceptor_tcp_tls_stream_enqueued(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpTlsStreamEnqueued,
+        ) {
+            self.acceptor_tcp_tls_stream_enqueued
+                .fetch_add(1, Ordering::Relaxed);
+            let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+            let event = crate::event::snapshot::Fmt::to_snapshot(event);
+            let out = format!("{meta:?} {event:?}");
+            self.output.lock().unwrap().push(out);
+        }
+        fn on_acceptor_tcp_tls_stream_rejected(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpTlsStreamRejected,
+        ) {
+            self.acceptor_tcp_tls_stream_rejected
+                .fetch_add(1, Ordering::Relaxed);
+            let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+            let event = crate::event::snapshot::Fmt::to_snapshot(event);
+            let out = format!("{meta:?} {event:?}");
+            self.output.lock().unwrap().push(out);
+        }
+        fn on_acceptor_tcp_synthetic_tls_stream_rejected(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::AcceptorTcpSyntheticTlsStreamRejected,
+        ) {
+            self.acceptor_tcp_synthetic_tls_stream_rejected
                 .fetch_add(1, Ordering::Relaxed);
             let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
             let event = crate::event::snapshot::Fmt::to_snapshot(event);
@@ -11037,6 +13196,25 @@ pub mod testing {
             let out = format!("{meta:?} {event:?}");
             self.output.lock().unwrap().push(out);
         }
+        fn on_stream_tls_connect(&self, meta: &api::EndpointMeta, event: &api::StreamTlsConnect) {
+            self.stream_tls_connect.fetch_add(1, Ordering::Relaxed);
+            let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+            let event = crate::event::snapshot::Fmt::to_snapshot(event);
+            let out = format!("{meta:?} {event:?}");
+            self.output.lock().unwrap().push(out);
+        }
+        fn on_stream_tls_connect_error(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::StreamTlsConnectError,
+        ) {
+            self.stream_tls_connect_error
+                .fetch_add(1, Ordering::Relaxed);
+            let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+            let event = crate::event::snapshot::Fmt::to_snapshot(event);
+            let out = format!("{meta:?} {event:?}");
+            self.output.lock().unwrap().push(out);
+        }
         fn on_stream_connect(&self, meta: &api::EndpointMeta, event: &api::StreamConnect) {
             self.stream_connect.fetch_add(1, Ordering::Relaxed);
             let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
@@ -11215,6 +13393,21 @@ pub mod testing {
                 self.output.lock().unwrap().push(out);
             }
         }
+        fn on_stream_handshake_packet_rejected(
+            &self,
+            _context: &Self::ConnectionContext,
+            meta: &api::ConnectionMeta,
+            event: &api::StreamHandshakePacketRejected,
+        ) {
+            self.stream_handshake_packet_rejected
+                .fetch_add(1, Ordering::Relaxed);
+            if self.location.is_some() {
+                let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+                let event = crate::event::snapshot::Fmt::to_snapshot(event);
+                let out = format!("{meta:?} {event:?}");
+                self.output.lock().unwrap().push(out);
+            }
+        }
         fn on_connection_closed(
             &self,
             _context: &Self::ConnectionContext,
@@ -11235,6 +13428,17 @@ pub mod testing {
             event: &api::EndpointInitialized,
         ) {
             self.endpoint_initialized.fetch_add(1, Ordering::Relaxed);
+            let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+            let event = crate::event::snapshot::Fmt::to_snapshot(event);
+            let out = format!("{meta:?} {event:?}");
+            self.output.lock().unwrap().push(out);
+        }
+        fn on_dc_connection_timeout(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::DcConnectionTimeout,
+        ) {
+            self.dc_connection_timeout.fetch_add(1, Ordering::Relaxed);
             let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
             let event = crate::event::snapshot::Fmt::to_snapshot(event);
             let out = format!("{meta:?} {event:?}");
@@ -11606,6 +13810,18 @@ pub mod testing {
             let out = format!("{meta:?} {event:?}");
             self.output.lock().unwrap().push(out);
         }
+        fn on_path_secret_map_serialized(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::PathSecretMapSerialized,
+        ) {
+            self.path_secret_map_serialized
+                .fetch_add(1, Ordering::Relaxed);
+            let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+            let event = crate::event::snapshot::Fmt::to_snapshot(event);
+            let out = format!("{meta:?} {event:?}");
+            self.output.lock().unwrap().push(out);
+        }
         fn on_path_secret_map_id_write_lock(
             &self,
             meta: &api::EndpointMeta,
@@ -11630,6 +13846,30 @@ pub mod testing {
             let out = format!("{meta:?} {event:?}");
             self.output.lock().unwrap().push(out);
         }
+        fn on_path_secret_map_datagram_encrypt(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::PathSecretMapDatagramEncrypt,
+        ) {
+            self.path_secret_map_datagram_encrypt
+                .fetch_add(1, Ordering::Relaxed);
+            let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+            let event = crate::event::snapshot::Fmt::to_snapshot(event);
+            let out = format!("{meta:?} {event:?}");
+            self.output.lock().unwrap().push(out);
+        }
+        fn on_path_secret_map_datagram_decrypt(
+            &self,
+            meta: &api::EndpointMeta,
+            event: &api::PathSecretMapDatagramDecrypt,
+        ) {
+            self.path_secret_map_datagram_decrypt
+                .fetch_add(1, Ordering::Relaxed);
+            let meta = crate::event::snapshot::Fmt::to_snapshot(meta);
+            let event = crate::event::snapshot::Fmt::to_snapshot(event);
+            let out = format!("{meta:?} {event:?}");
+            self.output.lock().unwrap().push(out);
+        }
     }
     #[derive(Debug)]
     pub struct Publisher {
@@ -11642,6 +13882,10 @@ pub mod testing {
         pub acceptor_tcp_stream_dropped: AtomicU64,
         pub acceptor_tcp_stream_replaced: AtomicU64,
         pub acceptor_tcp_packet_received: AtomicU64,
+        pub acceptor_tcp_tls_started: AtomicU64,
+        pub acceptor_tcp_tls_stream_enqueued: AtomicU64,
+        pub acceptor_tcp_tls_stream_rejected: AtomicU64,
+        pub acceptor_tcp_synthetic_tls_stream_rejected: AtomicU64,
         pub acceptor_tcp_packet_dropped: AtomicU64,
         pub acceptor_tcp_stream_enqueued: AtomicU64,
         pub acceptor_tcp_io_error: AtomicU64,
@@ -11676,6 +13920,8 @@ pub mod testing {
         pub stream_read_socket_errored: AtomicU64,
         pub stream_decrypt_packet: AtomicU64,
         pub stream_tcp_connect: AtomicU64,
+        pub stream_tls_connect: AtomicU64,
+        pub stream_tls_connect_error: AtomicU64,
         pub stream_connect: AtomicU64,
         pub stream_connect_error: AtomicU64,
         pub stream_packet_transmitted: AtomicU64,
@@ -11689,8 +13935,10 @@ pub mod testing {
         pub stream_control_packet_received: AtomicU64,
         pub stream_receiver_errored: AtomicU64,
         pub stream_sender_errored: AtomicU64,
+        pub stream_handshake_packet_rejected: AtomicU64,
         pub connection_closed: AtomicU64,
         pub endpoint_initialized: AtomicU64,
+        pub dc_connection_timeout: AtomicU64,
         pub path_secret_map_initialized: AtomicU64,
         pub path_secret_map_uninitialized: AtomicU64,
         pub path_secret_map_background_handshake_requested: AtomicU64,
@@ -11722,25 +13970,28 @@ pub mod testing {
         pub path_secret_map_id_cache_accessed: AtomicU64,
         pub path_secret_map_id_cache_accessed_hit: AtomicU64,
         pub path_secret_map_cleaner_cycled: AtomicU64,
+        pub path_secret_map_serialized: AtomicU64,
         pub path_secret_map_id_write_lock: AtomicU64,
         pub path_secret_map_address_write_lock: AtomicU64,
+        pub path_secret_map_datagram_encrypt: AtomicU64,
+        pub path_secret_map_datagram_decrypt: AtomicU64,
     }
     impl Publisher {
-        #[doc = r" Creates a publisher with snapshot assertions enabled"]
+        /// Creates a publisher with snapshot assertions enabled
         #[track_caller]
         pub fn snapshot() -> Self {
             let mut sub = Self::no_snapshot();
             sub.location = Location::from_thread_name();
             sub
         }
-        #[doc = r" Creates a subscriber with snapshot assertions enabled"]
+        /// Creates a subscriber with snapshot assertions enabled
         #[track_caller]
         pub fn named_snapshot<Name: core::fmt::Display>(name: Name) -> Self {
             let mut sub = Self::no_snapshot();
             sub.location = Some(Location::new(name));
             sub
         }
-        #[doc = r" Creates a publisher with snapshot assertions disabled"]
+        /// Creates a publisher with snapshot assertions disabled
         pub fn no_snapshot() -> Self {
             Self {
                 location: None,
@@ -11752,6 +14003,10 @@ pub mod testing {
                 acceptor_tcp_stream_dropped: AtomicU64::new(0),
                 acceptor_tcp_stream_replaced: AtomicU64::new(0),
                 acceptor_tcp_packet_received: AtomicU64::new(0),
+                acceptor_tcp_tls_started: AtomicU64::new(0),
+                acceptor_tcp_tls_stream_enqueued: AtomicU64::new(0),
+                acceptor_tcp_tls_stream_rejected: AtomicU64::new(0),
+                acceptor_tcp_synthetic_tls_stream_rejected: AtomicU64::new(0),
                 acceptor_tcp_packet_dropped: AtomicU64::new(0),
                 acceptor_tcp_stream_enqueued: AtomicU64::new(0),
                 acceptor_tcp_io_error: AtomicU64::new(0),
@@ -11786,6 +14041,8 @@ pub mod testing {
                 stream_read_socket_errored: AtomicU64::new(0),
                 stream_decrypt_packet: AtomicU64::new(0),
                 stream_tcp_connect: AtomicU64::new(0),
+                stream_tls_connect: AtomicU64::new(0),
+                stream_tls_connect_error: AtomicU64::new(0),
                 stream_connect: AtomicU64::new(0),
                 stream_connect_error: AtomicU64::new(0),
                 stream_packet_transmitted: AtomicU64::new(0),
@@ -11799,8 +14056,10 @@ pub mod testing {
                 stream_control_packet_received: AtomicU64::new(0),
                 stream_receiver_errored: AtomicU64::new(0),
                 stream_sender_errored: AtomicU64::new(0),
+                stream_handshake_packet_rejected: AtomicU64::new(0),
                 connection_closed: AtomicU64::new(0),
                 endpoint_initialized: AtomicU64::new(0),
+                dc_connection_timeout: AtomicU64::new(0),
                 path_secret_map_initialized: AtomicU64::new(0),
                 path_secret_map_uninitialized: AtomicU64::new(0),
                 path_secret_map_background_handshake_requested: AtomicU64::new(0),
@@ -11832,8 +14091,11 @@ pub mod testing {
                 path_secret_map_id_cache_accessed: AtomicU64::new(0),
                 path_secret_map_id_cache_accessed_hit: AtomicU64::new(0),
                 path_secret_map_cleaner_cycled: AtomicU64::new(0),
+                path_secret_map_serialized: AtomicU64::new(0),
                 path_secret_map_id_write_lock: AtomicU64::new(0),
                 path_secret_map_address_write_lock: AtomicU64::new(0),
+                path_secret_map_datagram_encrypt: AtomicU64::new(0),
+                path_secret_map_datagram_decrypt: AtomicU64::new(0),
             }
         }
     }
@@ -11893,6 +14155,47 @@ pub mod testing {
         }
         fn on_acceptor_tcp_packet_received(&self, event: builder::AcceptorTcpPacketReceived) {
             self.acceptor_tcp_packet_received
+                .fetch_add(1, Ordering::Relaxed);
+            let event = event.into_event();
+            let event = crate::event::snapshot::Fmt::to_snapshot(&event);
+            let out = format!("{event:?}");
+            self.output.lock().unwrap().push(out);
+        }
+        fn on_acceptor_tcp_tls_started(&self, event: builder::AcceptorTcpTlsStarted) {
+            self.acceptor_tcp_tls_started
+                .fetch_add(1, Ordering::Relaxed);
+            let event = event.into_event();
+            let event = crate::event::snapshot::Fmt::to_snapshot(&event);
+            let out = format!("{event:?}");
+            self.output.lock().unwrap().push(out);
+        }
+        fn on_acceptor_tcp_tls_stream_enqueued(
+            &self,
+            event: builder::AcceptorTcpTlsStreamEnqueued,
+        ) {
+            self.acceptor_tcp_tls_stream_enqueued
+                .fetch_add(1, Ordering::Relaxed);
+            let event = event.into_event();
+            let event = crate::event::snapshot::Fmt::to_snapshot(&event);
+            let out = format!("{event:?}");
+            self.output.lock().unwrap().push(out);
+        }
+        fn on_acceptor_tcp_tls_stream_rejected(
+            &self,
+            event: builder::AcceptorTcpTlsStreamRejected,
+        ) {
+            self.acceptor_tcp_tls_stream_rejected
+                .fetch_add(1, Ordering::Relaxed);
+            let event = event.into_event();
+            let event = crate::event::snapshot::Fmt::to_snapshot(&event);
+            let out = format!("{event:?}");
+            self.output.lock().unwrap().push(out);
+        }
+        fn on_acceptor_tcp_synthetic_tls_stream_rejected(
+            &self,
+            event: builder::AcceptorTcpSyntheticTlsStreamRejected,
+        ) {
+            self.acceptor_tcp_synthetic_tls_stream_rejected
                 .fetch_add(1, Ordering::Relaxed);
             let event = event.into_event();
             let event = crate::event::snapshot::Fmt::to_snapshot(&event);
@@ -12006,6 +14309,21 @@ pub mod testing {
             let out = format!("{event:?}");
             self.output.lock().unwrap().push(out);
         }
+        fn on_stream_tls_connect(&self, event: builder::StreamTlsConnect) {
+            self.stream_tls_connect.fetch_add(1, Ordering::Relaxed);
+            let event = event.into_event();
+            let event = crate::event::snapshot::Fmt::to_snapshot(&event);
+            let out = format!("{event:?}");
+            self.output.lock().unwrap().push(out);
+        }
+        fn on_stream_tls_connect_error(&self, event: builder::StreamTlsConnectError) {
+            self.stream_tls_connect_error
+                .fetch_add(1, Ordering::Relaxed);
+            let event = event.into_event();
+            let event = crate::event::snapshot::Fmt::to_snapshot(&event);
+            let out = format!("{event:?}");
+            self.output.lock().unwrap().push(out);
+        }
         fn on_stream_connect(&self, event: builder::StreamConnect) {
             self.stream_connect.fetch_add(1, Ordering::Relaxed);
             let event = event.into_event();
@@ -12022,6 +14340,13 @@ pub mod testing {
         }
         fn on_endpoint_initialized(&self, event: builder::EndpointInitialized) {
             self.endpoint_initialized.fetch_add(1, Ordering::Relaxed);
+            let event = event.into_event();
+            let event = crate::event::snapshot::Fmt::to_snapshot(&event);
+            let out = format!("{event:?}");
+            self.output.lock().unwrap().push(out);
+        }
+        fn on_dc_connection_timeout(&self, event: builder::DcConnectionTimeout) {
+            self.dc_connection_timeout.fetch_add(1, Ordering::Relaxed);
             let event = event.into_event();
             let event = crate::event::snapshot::Fmt::to_snapshot(&event);
             let out = format!("{event:?}");
@@ -12303,6 +14628,14 @@ pub mod testing {
             let out = format!("{event:?}");
             self.output.lock().unwrap().push(out);
         }
+        fn on_path_secret_map_serialized(&self, event: builder::PathSecretMapSerialized) {
+            self.path_secret_map_serialized
+                .fetch_add(1, Ordering::Relaxed);
+            let event = event.into_event();
+            let event = crate::event::snapshot::Fmt::to_snapshot(&event);
+            let out = format!("{event:?}");
+            self.output.lock().unwrap().push(out);
+        }
         fn on_path_secret_map_id_write_lock(&self, event: builder::PathSecretMapIdWriteLock) {
             self.path_secret_map_id_write_lock
                 .fetch_add(1, Ordering::Relaxed);
@@ -12316,6 +14649,28 @@ pub mod testing {
             event: builder::PathSecretMapAddressWriteLock,
         ) {
             self.path_secret_map_address_write_lock
+                .fetch_add(1, Ordering::Relaxed);
+            let event = event.into_event();
+            let event = crate::event::snapshot::Fmt::to_snapshot(&event);
+            let out = format!("{event:?}");
+            self.output.lock().unwrap().push(out);
+        }
+        fn on_path_secret_map_datagram_encrypt(
+            &self,
+            event: builder::PathSecretMapDatagramEncrypt,
+        ) {
+            self.path_secret_map_datagram_encrypt
+                .fetch_add(1, Ordering::Relaxed);
+            let event = event.into_event();
+            let event = crate::event::snapshot::Fmt::to_snapshot(&event);
+            let out = format!("{event:?}");
+            self.output.lock().unwrap().push(out);
+        }
+        fn on_path_secret_map_datagram_decrypt(
+            &self,
+            event: builder::PathSecretMapDatagramDecrypt,
+        ) {
+            self.path_secret_map_datagram_decrypt
                 .fetch_add(1, Ordering::Relaxed);
             let event = event.into_event();
             let event = crate::event::snapshot::Fmt::to_snapshot(&event);
@@ -12619,6 +14974,19 @@ pub mod testing {
         }
         fn on_stream_sender_errored(&self, event: builder::StreamSenderErrored) {
             self.stream_sender_errored.fetch_add(1, Ordering::Relaxed);
+            let event = event.into_event();
+            if self.location.is_some() {
+                let event = crate::event::snapshot::Fmt::to_snapshot(&event);
+                let out = format!("{event:?}");
+                self.output.lock().unwrap().push(out);
+            }
+        }
+        fn on_stream_handshake_packet_rejected(
+            &self,
+            event: builder::StreamHandshakePacketRejected,
+        ) {
+            self.stream_handshake_packet_rejected
+                .fetch_add(1, Ordering::Relaxed);
             let event = event.into_event();
             if self.location.is_some() {
                 let event = crate::event::snapshot::Fmt::to_snapshot(&event);

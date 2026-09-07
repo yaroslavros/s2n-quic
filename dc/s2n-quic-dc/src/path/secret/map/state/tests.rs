@@ -10,7 +10,7 @@ use s2n_quic_core::{dc, time::NoopClock as Clock};
 use std::{
     collections::HashSet,
     fmt,
-    net::{Ipv4Addr, SocketAddrV4},
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
 };
 
 fn fake_entry(port: u16) -> Arc<Entry> {
@@ -20,7 +20,13 @@ fn fake_entry(port: u16) -> Arc<Entry> {
 #[test]
 fn cleans_after_delay() {
     let signer = stateless_reset::Signer::new(b"secret");
-    let map = State::new(signer, 50, Clock, tracing::Subscriber::default());
+    let map = State::builder()
+        .with_signer(signer)
+        .with_capacity(50)
+        .with_clock(Clock)
+        .with_subscriber(tracing::Subscriber::default())
+        .build()
+        .unwrap();
 
     // Stop background processing. We expect to manually invoke clean, and a background worker
     // might interfere with our state.
@@ -48,15 +54,16 @@ fn cleans_after_delay() {
 #[test]
 fn thread_shutdown() {
     let signer = stateless_reset::Signer::new(b"secret");
-    let map = State::new(
-        signer,
-        10,
-        Clock,
-        (
+    let map = State::builder()
+        .with_signer(signer)
+        .with_capacity(10)
+        .with_clock(Clock)
+        .with_subscriber((
             tracing::Subscriber::default(),
             testing::Subscriber::snapshot(),
-        ),
-    );
+        ))
+        .build()
+        .unwrap();
     let state = Arc::downgrade(&map);
     drop(map);
 
@@ -73,6 +80,95 @@ fn thread_shutdown() {
     }
 
     panic!("thread did not shut down after {max_time:?}");
+}
+
+#[test]
+fn serialize_to_disk_writes_configured_entries() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("secrets");
+
+    let signer = stateless_reset::Signer::new(b"secret");
+    let map = State::builder()
+        .with_signer(signer)
+        .with_capacity(50)
+        .with_clock(Clock)
+        .with_subscriber(tracing::Subscriber::default())
+        .with_serializer(disk::Serializer::builder(&path).build().unwrap())
+        .build()
+        .unwrap();
+
+    // Stop background processing so the cleaner thread doesn't race our manual serialization.
+    map.cleaner.stop();
+
+    let first = fake_entry(1);
+    let second = fake_entry(2);
+    map.test_insert(first.clone());
+    map.test_insert(second.clone());
+
+    // Access `second` so it is more recently used than `first`, despite being inserted later (and
+    // so sitting behind `first` in the FIFO eviction queue).
+    assert!(map.get_by_addr_tracked(second.peer()).is_some());
+
+    map.serialize_to_disk().unwrap();
+
+    // Both entries are written, ordered most-recently-accessed first: `second` ahead of the
+    // never-accessed `first` -- i.e. by access recency, not eviction (FIFO) order.
+    let decoded: Vec<SocketAddr> = disk::deserialize(&path)
+        .unwrap()
+        .map(|e| e.unwrap().peer)
+        .collect();
+    assert_eq!(decoded, vec![*second.peer(), *first.peer()]);
+}
+
+#[test]
+fn serialize_to_disk_emits_event() {
+    use std::sync::atomic::Ordering;
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("secrets");
+
+    let subscriber = Arc::new(testing::Subscriber::no_snapshot());
+
+    let signer = stateless_reset::Signer::new(b"secret");
+    let map = State::builder()
+        .with_signer(signer)
+        .with_capacity(50)
+        .with_clock(Clock)
+        .with_subscriber(subscriber.clone())
+        .with_serializer(disk::Serializer::builder(&path).build().unwrap())
+        .build()
+        .unwrap();
+
+    // Stop background processing so the cleaner thread doesn't race our manual serialization.
+    map.cleaner.stop();
+
+    map.test_insert(fake_entry(1));
+    map.test_insert(fake_entry(2));
+
+    map.serialize_to_disk().unwrap();
+
+    assert_eq!(
+        subscriber
+            .path_secret_map_serialized
+            .load(Ordering::Relaxed),
+        1
+    );
+}
+
+#[test]
+fn serialize_to_disk_without_serializer_is_noop() {
+    let signer = stateless_reset::Signer::new(b"secret");
+    let map = State::builder()
+        .with_signer(signer)
+        .with_capacity(50)
+        .with_clock(Clock)
+        .with_subscriber(tracing::Subscriber::default())
+        .build()
+        .unwrap();
+    map.cleaner.stop();
+
+    // No serializer configured: this is a no-op and must not error.
+    map.serialize_to_disk().unwrap();
 }
 
 #[derive(Debug, Default)]
@@ -177,11 +273,25 @@ impl Model {
                         id,
                         &stateless_reset,
                     );
+
                 state
                     .handle_unknown_path_secret_packet(&packet, &"127.0.0.1:1234".parse().unwrap());
 
-                // ReceiveUnknown does not cause any action with respect to our invariants, no
-                // updates required.
+                if state.should_evict_on_unknown_path_secret()
+                    && self.invariants.contains(&Invariant::ContainsId(id))
+                {
+                    self.invariants.retain(|invariant| {
+                        if let Invariant::ContainsId(prev_id) = invariant {
+                            if prev_id == &id {
+                                return false;
+                            }
+                        }
+
+                        true
+                    });
+
+                    self.invariants.insert(Invariant::IdRemoved(id));
+                }
             }
         }
     }
@@ -242,8 +352,7 @@ fn has_duplicate_pids(ops: &[Operation]) -> bool {
     false
 }
 
-#[test]
-fn check_invariants() {
+fn check_invariants_inner(should_evict_on_unknown_path_secret: bool) {
     bolero::check!()
         .with_type::<Vec<Operation>>()
         .with_iterations(10_000)
@@ -255,12 +364,21 @@ fn check_invariants() {
 
             let mut model = Model::default();
             let signer = stateless_reset::Signer::new(b"secret");
-            let mut map = State::new(signer, 10_000, Clock, tracing::Subscriber::default());
+            let mut map = State::builder()
+                .with_signer(signer)
+                .with_capacity(10_000)
+                .with_evict_on_unknown_path_secret(should_evict_on_unknown_path_secret)
+                .with_clock(Clock)
+                .with_subscriber(tracing::Subscriber::default())
+                .build()
+                .unwrap();
 
             // Avoid background work interfering with testing.
             map.cleaner.stop();
 
-            Arc::get_mut(&mut map).unwrap().set_max_capacity(5);
+            Arc::<State<Clock, tracing::Subscriber>>::get_mut(&mut map)
+                .unwrap()
+                .set_max_capacity(5);
 
             model.check_invariants(&map);
 
@@ -269,6 +387,16 @@ fn check_invariants() {
                 model.check_invariants(&map);
             }
         })
+}
+
+#[test]
+fn check_invariants() {
+    check_invariants_inner(false);
+}
+
+#[test]
+fn check_invariants_evict_unknown_pid() {
+    check_invariants_inner(true);
 }
 
 #[test]
@@ -285,7 +413,13 @@ fn check_invariants_no_overflow() {
 
             let mut model = Model::default();
             let signer = stateless_reset::Signer::new(b"secret");
-            let map = State::new(signer, 10_000, Clock, tracing::Subscriber::default());
+            let map = State::builder()
+                .with_signer(signer)
+                .with_capacity(10_000)
+                .with_clock(Clock)
+                .with_subscriber(tracing::Subscriber::default())
+                .build()
+                .unwrap();
 
             // Avoid background work interfering with testing.
             map.cleaner.stop();
@@ -308,11 +442,104 @@ fn check_invariants_no_overflow() {
 #[ignore = "memory growth takes a long time to run"]
 fn no_memory_growth() {
     let signer = stateless_reset::Signer::new(b"secret");
-    let map = State::new(signer, 100_000, Clock, tracing::Subscriber::default());
+    let map = State::builder()
+        .with_signer(signer)
+        .with_capacity(100_000)
+        .with_clock(Clock)
+        .with_subscriber(tracing::Subscriber::default())
+        .build()
+        .unwrap();
     map.cleaner.stop();
 
     for idx in 0..500_000 {
         // FIXME: this ends up 2**16 peers in the `peers` map
         map.test_insert(fake_entry(idx as u16));
+    }
+}
+
+#[test]
+fn unknown_path_secret_evicts() {
+    let signer = stateless_reset::Signer::new(b"secret");
+    let map = State::builder()
+        .with_signer(signer)
+        .with_capacity(5)
+        .with_evict_on_unknown_path_secret(true)
+        .with_clock(Clock)
+        .with_subscriber(tracing::Subscriber::default())
+        .build()
+        .unwrap();
+
+    let entry = fake_entry(0);
+    map.test_insert(entry.clone());
+
+    let packet = crate::packet::secret_control::unknown_path_secret::Packet::new_for_test(
+        *entry.clone().id(),
+        &entry.sender().stateless_reset,
+    );
+
+    assert!(map.ids.contains_key(entry.id()), "{:?}", map.ids);
+    assert!(map.peers.contains_key(entry.peer()), "{:?}", map.peers);
+
+    map.handle_unknown_path_secret_packet(&packet, &"127.0.0.1:1234".parse().unwrap());
+
+    assert!(!map.ids.contains_key(entry.id()), "{:?}", map.ids);
+    assert!(!map.peers.contains_key(entry.peer()), "{:?}", map.peers);
+}
+
+/// Builds a `State` whose signer uses `secret`, with background processing stopped.
+fn state_with_secret(secret: &[u8]) -> Arc<State<Clock, tracing::Subscriber>> {
+    let map = State::builder()
+        .with_signer(stateless_reset::Signer::new(secret))
+        .with_capacity(64)
+        .with_clock(Clock)
+        .with_subscriber(tracing::Subscriber::default())
+        .build()
+        .unwrap();
+    map.cleaner.stop();
+    map
+}
+
+fn disk_entry(port: u16, id: Option<u8>) -> DiskEntry {
+    DiskEntry {
+        peer: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, port)),
+        id: id.map(|b| Id::from([b; 16])),
+    }
+}
+
+#[test]
+fn send_unknown_path_secrets_over_control_socket_ok() {
+    use core::num::NonZeroU32;
+    use std::time::Duration;
+
+    // Exercises the real control-socket send path. Packets go to loopback discard ports; the call
+    // should succeed and the counters should partition the input.
+    let map = state_with_secret(b"secret");
+    let entries: Vec<DiskEntry> = (0..16)
+        .map(|n| disk_entry(5000 + n, Some(n as u8)))
+        .collect();
+    let total = entries.len();
+
+    let result = map.send_unknown_path_secrets(
+        &mut entries.into_iter(),
+        NonZeroU32::new(100_000).unwrap(),
+        Duration::from_secs(5),
+    );
+
+    match result {
+        Ok(stats) => {
+            assert_eq!(
+                stats.sent + stats.failed + stats.skipped + stats.remaining,
+                total
+            );
+            assert_eq!(stats.skipped, 0);
+            assert_eq!(stats.remaining, 0);
+        }
+        // Some environments (e.g. sandboxes) can't create the UDP control socket, in which case
+        // there is nothing to send on. That is a supported outcome, not a test failure -- the
+        // socket-independent behavior is covered by the `proactive_unknown_path_secret` unit tests.
+        Err(err) if err.kind() == std::io::ErrorKind::NotConnected => {
+            eprintln!("skipping: no control socket available in this environment ({err})");
+        }
+        Err(err) => panic!("unexpected error: {err}"),
     }
 }

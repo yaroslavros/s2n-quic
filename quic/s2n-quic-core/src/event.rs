@@ -197,8 +197,20 @@ impl<'a> TlsSession<'a> {
         self.session.peer_cert_chain_der()
     }
 
+    // Currently intended only for unstable usage
+    #[doc(hidden)]
+    #[cfg(feature = "alloc")]
+    pub fn client_cert_chain_der(&self) -> Result<Option<Vec<u8>>, crate::crypto::tls::ChainError> {
+        self.session.client_cert_chain_der()
+    }
+
     pub fn cipher_suite(&self) -> crate::event::api::CipherSuite {
         self.session.cipher_suite().into_event()
+    }
+
+    /// The signature scheme used to authenticate the server for this connection
+    pub fn signature_scheme(&self) -> Option<&'static str> {
+        self.session.signature_scheme()
     }
 }
 

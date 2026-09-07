@@ -17,12 +17,16 @@ use s2n_codec::DecoderBufferMut;
 use s2n_quic_core::{
     crypto::{tls, tls::Endpoint as TLSEndpoint, CryptoSuite, InitialKey},
     datagram::{Endpoint, PreConnectionInfo},
+    dc::Endpoint as _,
     event::{self, supervisor, ConnectionPublisher, EndpointPublisher, IntoEvent, Subscriber as _},
     inet::{datagram, DatagramInfo},
     packet::initial::ProtectedInitial,
     path::Handle as _,
     stateless_reset::token::Generator as _,
-    transport::{self, parameters::ServerTransportParameters},
+    transport::{
+        self,
+        parameters::{MtuProbingCompleteSupport, ServerTransportParameters},
+    },
 };
 
 impl<Config: endpoint::Config> endpoint::Endpoint<Config> {
@@ -226,9 +230,16 @@ impl<Config: endpoint::Config> endpoint::Endpoint<Config> {
             .try_into()
             .expect("Failed to convert max_datagram_frame_size");
 
+        if endpoint_context.dc.mtu_probing_complete_support() {
+            transport_parameters.mtu_probing_complete_support = MtuProbingCompleteSupport::Enabled;
+        }
+
+        let local_address = header.path.local_address();
+        let connection_info = tls::ConnectionInfo::new(local_address, remote_address);
+
         let tls_session = endpoint_context
             .tls
-            .new_server_session(&transport_parameters);
+            .new_server_session(&transport_parameters, connection_info);
 
         let quic_version = packet.version;
 
@@ -247,7 +258,12 @@ impl<Config: endpoint::Config> endpoint::Endpoint<Config> {
 
         let mut event_context = endpoint_context.event_subscriber.create_connection_context(
             &meta.clone().into_event(),
-            &event::builder::ConnectionInfo {}.into_event(),
+            &event::builder::ConnectionInfo {
+                // Servers can't provide meaningful application context since there's not been an
+                // accept() yet.
+                application: None,
+            }
+            .into_event(),
         );
 
         let mut endpoint_publisher = event::EndpointPublisherSubscriber::new(
@@ -317,6 +333,8 @@ impl<Config: endpoint::Config> endpoint::Endpoint<Config> {
             open_registry: None,
             limits_endpoint: endpoint_context.connection_limits,
             random_generator: endpoint_context.random_generator,
+            interceptor_endpoint: endpoint_context.packet_interceptor,
+            connection_id_validator: endpoint_context.connection_id_format,
         };
 
         let mut connection = <Config as endpoint::Config>::Connection::new(connection_parameters)?;
@@ -341,8 +359,8 @@ impl<Config: endpoint::Config> endpoint::Endpoint<Config> {
                         endpoint_context.event_subscriber,
                         |publisher, _path| {
                             publisher.on_datagram_dropped(event::builder::DatagramDropped {
-                                local_addr: header.path.local_address().into_event(),
-                                remote_addr: header.path.remote_address().into_event(),
+                                local_addr: local_address.into_event(),
+                                remote_addr: remote_address.into_event(),
                                 destination_cid: datagram.destination_connection_id.into_event(),
                                 source_cid: datagram
                                     .source_connection_id
@@ -371,6 +389,7 @@ impl<Config: endpoint::Config> endpoint::Endpoint<Config> {
                         endpoint_context.datagram,
                         endpoint_context.dc,
                         endpoint_context.connection_limits,
+                        endpoint_context.connection_id_format,
                     )
                     .map_err(|err| {
                         use connection::ProcessingError;

@@ -8,7 +8,7 @@ use crate::{
     path::secret,
     stream::{
         application::Stream,
-        client::{rpc as rpc_internal, tokio as client},
+        client::{error as client_error, rpc as rpc_internal, tokio as client},
         endpoint,
         environment::{
             tokio::{self as env, Environment},
@@ -18,8 +18,8 @@ use crate::{
     },
 };
 use s2n_quic::server::Name;
-use s2n_quic_core::time::Clock;
-use std::{io, net::SocketAddr, time::Duration};
+use s2n_quic_core::time::{Clock, Timestamp};
+use std::{io, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::net::TcpStream;
 
 pub mod rpc {
@@ -37,6 +37,13 @@ pub trait Handshake: Clone {
         server_name: Name,
     ) -> std::io::Result<(secret::map::Peer, secret::HandshakeKind)>;
 
+    /// Initiates a handshake with the remote peer in the background, returning immediately.
+    fn background_handshake_with(
+        &self,
+        remote_handshake_addr: SocketAddr,
+        server_name: Name,
+    ) -> std::io::Result<secret::HandshakeKind>;
+
     fn local_addr(&self) -> std::io::Result<SocketAddr>;
 
     fn map(&self) -> &secret::Map;
@@ -48,8 +55,16 @@ impl Handshake for crate::psk::client::Provider {
         remote_handshake_addr: SocketAddr,
         server_name: Name,
     ) -> std::io::Result<(secret::map::Peer, secret::HandshakeKind)> {
-        self.handshake_with_entry(remote_handshake_addr, |_conn, _duration| {}, server_name)
+        self.handshake_with_entry(remote_handshake_addr, server_name)
             .await
+    }
+
+    fn background_handshake_with(
+        &self,
+        remote_handshake_addr: SocketAddr,
+        server_name: Name,
+    ) -> std::io::Result<secret::HandshakeKind> {
+        self.background_handshake_with(remote_handshake_addr, server_name)
     }
 
     fn local_addr(&self) -> std::io::Result<SocketAddr> {
@@ -67,6 +82,7 @@ pub struct Client<H: Handshake + Clone, S: event::Subscriber + Clone> {
     handshake: H,
     default_protocol: socket::Protocol,
     linger: Option<Duration>,
+    fail_fast_on_missing_psk: bool,
 }
 
 impl<H: Handshake + Clone, S: event::Subscriber + Clone> Client<H, S> {
@@ -99,6 +115,32 @@ impl<H: Handshake + Clone, S: event::Subscriber + Clone> Client<H, S> {
             .handshake_with_entry(remote_handshake_addr, server_name)
             .await?;
         Ok(kind)
+    }
+
+    /// When fail_fast_on_missing_psk is set and no path secret is cached for the peer, this kicks
+    /// off a background handshake and returns PeerPskMissing. Also, for TCP it emits events.
+    #[inline]
+    fn fail_fast_if_psk_missing(
+        &self,
+        remote_handshake_addr: SocketAddr,
+        server_name: &Name,
+        protocol: socket::Protocol,
+    ) -> io::Result<()> {
+        if self.fail_fast_on_missing_psk && !self.handshake.map().contains(&remote_handshake_addr) {
+            let _ = self
+                .handshake
+                .background_handshake_with(remote_handshake_addr, server_name.clone());
+            if matches!(protocol, socket::Protocol::Tcp) {
+                self.env.endpoint_publisher().on_stream_connect_error(
+                    event::builder::StreamConnectError {
+                        reason: StreamTcpConnectErrorReason::PeerPskMissing,
+                        latency: Duration::ZERO,
+                    },
+                );
+            }
+            return Err(client_error::Kind::PeerPskMissing.err().into());
+        }
+        Ok(())
     }
 
     #[inline]
@@ -187,6 +229,7 @@ impl<H: Handshake + Clone, S: event::Subscriber + Clone> Client<H, S> {
         acceptor_addr: SocketAddr,
         server_name: Name,
     ) -> io::Result<Stream<S>> {
+        self.fail_fast_if_psk_missing(handshake_addr, &server_name, socket::Protocol::Udp)?;
         // ensure we have a secret for the peer
         let handshake = self.handshake_for_connect(handshake_addr, server_name);
 
@@ -209,6 +252,7 @@ impl<H: Handshake + Clone, S: event::Subscriber + Clone> Client<H, S> {
         Req: rpc::Request,
         Res: rpc::Response,
     {
+        self.fail_fast_if_psk_missing(handshake_addr, &server_name, socket::Protocol::Udp)?;
         // ensure we have a secret for the peer
         let handshake = self.handshake_for_connect(handshake_addr, server_name);
 
@@ -224,12 +268,35 @@ impl<H: Handshake + Clone, S: event::Subscriber + Clone> Client<H, S> {
         acceptor_addr: SocketAddr,
         server_name: Name,
     ) -> io::Result<Stream<S>> {
+        self.fail_fast_if_psk_missing(handshake_addr, &server_name, socket::Protocol::Tcp)?;
         // ensure we have a secret for the peer
         let handshake = self.handshake_for_connect(handshake_addr, server_name);
 
         let mut stream =
             client::connect_tcp(handshake, acceptor_addr, &self.env, self.linger).await?;
         Self::write_prelude(&mut stream).await?;
+        Ok(stream)
+    }
+
+    /// Connects using the TLS over TCP transport layer.
+    ///
+    /// Note that the handshake and acceptor addresses must be the same for TLS.
+    #[inline]
+    pub async fn connect_tls(
+        &self,
+        addr: SocketAddr,
+        server_name: Name,
+        config: &impl crate::stream::TlsConnectionBuilder,
+    ) -> io::Result<Stream<S>> {
+        let stream = client::connect_tls(
+            addr,
+            server_name,
+            config,
+            &self.env,
+            self.linger,
+            self.handshake.map(),
+        )
+        .await?;
         Ok(stream)
     }
 
@@ -247,11 +314,32 @@ impl<H: Handshake + Clone, S: event::Subscriber + Clone> Client<H, S> {
         Req: rpc::Request,
         Res: rpc::Response,
     {
+        self.fail_fast_if_psk_missing(handshake_addr, &server_name, socket::Protocol::Tcp)?;
         // ensure we have a secret for the peer
         let handshake = self.handshake_for_connect(handshake_addr, server_name);
 
         let stream = client::connect_tcp(handshake, acceptor_addr, &self.env, self.linger).await?;
         rpc_internal::from_stream(stream, request, response).await
+    }
+
+    /// Connects using the TLS over TCP transport layer with a pre-existing TCP stream.
+    #[inline]
+    pub async fn connect_tls_with(
+        &self,
+        stream: TcpStream,
+        server_name: Name,
+        config: &impl crate::stream::TlsConnectionBuilder,
+    ) -> io::Result<Stream<S>> {
+        let stream = client::connect_tls_with(
+            stream,
+            server_name,
+            config,
+            &self.env,
+            self.linger,
+            self.handshake.map(),
+        )
+        .await?;
+        Ok(stream)
     }
 
     /// Connects with a pre-existing TCP stream
@@ -262,6 +350,7 @@ impl<H: Handshake + Clone, S: event::Subscriber + Clone> Client<H, S> {
         stream: TcpStream,
         server_name: Name,
     ) -> io::Result<Stream<S>> {
+        self.fail_fast_if_psk_missing(handshake_addr, &server_name, socket::Protocol::Tcp)?;
         // ensure we have a secret for the peer
         let handshake = self
             .handshake_for_connect(handshake_addr, server_name)
@@ -291,6 +380,7 @@ pub struct Builder {
     linger: Option<Duration>,
     send_buffer: Option<usize>,
     recv_buffer: Option<usize>,
+    fail_fast_on_missing_psk: bool,
 }
 
 impl Builder {
@@ -347,6 +437,15 @@ impl Builder {
         self
     }
 
+    /// Fail fast when the peer's path secret (PSK) is not cached locally.
+    ///
+    /// When enabled, connect attempts do not block on a handshake: if no path secret is cached for
+    /// the peer, a background handshake is initiated and the connect fails fast.
+    pub fn with_fail_fast_on_missing_psk(mut self, fail_fast_on_missing_psk: bool) -> Self {
+        self.fail_fast_on_missing_psk = fail_fast_on_missing_psk;
+        self
+    }
+
     #[inline]
     pub fn build<H: Handshake + Clone, S: event::Subscriber + Clone>(
         self,
@@ -381,6 +480,7 @@ impl Builder {
             handshake,
             default_protocol,
             linger,
+            fail_fast_on_missing_psk: self.fail_fast_on_missing_psk,
         })
     }
 }
@@ -423,15 +523,20 @@ where
 
 struct DropGuard<'a, S: event::Subscriber + Clone> {
     env: &'a Environment<S>,
+    start: Timestamp,
     reason: Option<StreamTcpConnectErrorReason>,
 }
 
 impl<S: event::Subscriber + Clone> Drop for DropGuard<'_, S> {
     fn drop(&mut self) {
         if let Some(reason) = self.reason.take() {
+            let now = self.env.clock().get_time();
             self.env
-                .endpoint_publisher()
-                .on_stream_connect_error(event::builder::StreamConnectError { reason });
+                .endpoint_publisher_with_time(now)
+                .on_stream_connect_error(event::builder::StreamConnectError {
+                    reason,
+                    latency: now.saturating_duration_since(self.start),
+                });
         }
     }
 }
@@ -451,10 +556,12 @@ where
     H: core::future::Future<Output = io::Result<secret::map::Peer>>,
     Sub: event::Subscriber + Clone,
 {
+    let start = env.clock().get_time();
     // This emits the error event in case this future gets dropped.
     let mut guard = DropGuard {
         env,
-        reason: Some(StreamTcpConnectErrorReason::Aborted),
+        reason: Some(StreamTcpConnectErrorReason::AbortedPendingBoth),
+        start,
     };
 
     let connect = TcpStream::connect(acceptor_addr);
@@ -469,7 +576,6 @@ where
     let mut error = None;
     let mut socket = None;
     let mut peer = None;
-    let start = env.clock().get_time();
     while (socket.is_none() || peer.is_none()) && error.is_none() {
         tokio::select! {
             connected = &mut connect, if socket.is_none() => {
@@ -479,7 +585,15 @@ where
                     latency: now.saturating_duration_since(start),
                 });
                 match connected {
-                    Ok(v) => socket = Some(Ok(v)),
+                    Ok(v) => {
+                        socket = Some(Ok(v));
+                        guard.reason = match guard.reason.clone() {
+                            Some(StreamTcpConnectErrorReason::AbortedPendingBoth) => Some(
+                                StreamTcpConnectErrorReason::AbortedPendingHandshake
+                            ),
+                            other => other,
+                        };
+                    },
                     Err(e) => {
                         guard.reason = Some(StreamTcpConnectErrorReason::TcpConnect);
                         error = Some(e);
@@ -489,7 +603,15 @@ where
             }
             handshaked = &mut handshake, if peer.is_none() => {
                 match handshaked {
-                    Ok(v) => peer = Some(Ok(v)),
+                    Ok(v) => {
+                        peer = Some(Ok(v));
+                        guard.reason = match guard.reason.clone() {
+                            Some(StreamTcpConnectErrorReason::AbortedPendingBoth) => Some(
+                                StreamTcpConnectErrorReason::AbortedPendingConnect
+                            ),
+                            other => other,
+                        };
+                    },
                     Err(e) => {
                         guard.reason = Some(StreamTcpConnectErrorReason::Handshake);
                         error = Some(e);
@@ -522,7 +644,10 @@ where
         });
 
     let (Some(Ok(socket)), Some(Ok(entry))) = (socket, peer) else {
-        // unwrap is OK -- if socket or peer isn't present the error should be set.
+        #[expect(
+            clippy::unwrap_used,
+            reason = "if socket or peer isn't present the error is always set, as documented above"
+        )]
         return Err(error.unwrap());
     };
 
@@ -530,6 +655,7 @@ where
     let _ = socket.set_nodelay(true);
 
     if linger.is_some() {
+        #[allow(deprecated)]
         let _ = socket.set_linger(linger);
     }
 
@@ -603,4 +729,222 @@ fn recv_buffer() -> recv::shared::RecvBuffer {
     // TODO replace this with a parameter once everything is in place
     let recv_buffer = recv::buffer::Local::new(msg::recv::Message::new(9000), None);
     Either::A(recv_buffer)
+}
+
+/// Connects and negotiated TLS 1.3
+#[inline]
+pub async fn connect_tls<Sub>(
+    addr: SocketAddr,
+    server_name: Name,
+    config: &impl crate::stream::TlsConnectionBuilder,
+    env: &Environment<Sub>,
+    linger: Option<Duration>,
+    // FIXME: Do we really need the map for this?
+    map: &crate::path::secret::Map,
+) -> io::Result<Stream<Sub>>
+where
+    Sub: event::Subscriber + Clone,
+{
+    let start = env.clock().get_time();
+    // This emits the error event in case this future gets dropped.
+    let mut guard = DropGuard {
+        env,
+        reason: Some(StreamTcpConnectErrorReason::AbortedPendingBoth),
+        start,
+    };
+
+    let connected = TcpStream::connect(addr).await;
+    let kernel_start_time = env.clock().get_time();
+    env.endpoint_publisher_with_time(kernel_start_time)
+        .on_stream_tcp_connect(event::builder::StreamTcpConnect {
+            error: connected.is_err(),
+            latency: kernel_start_time.saturating_duration_since(start),
+        });
+    let socket = match connected {
+        Ok(v) => {
+            guard.reason = Some(StreamTcpConnectErrorReason::AbortedPendingHandshake);
+            v
+        }
+        Err(e) => {
+            guard.reason = Some(StreamTcpConnectErrorReason::TcpConnect);
+            return Err(e);
+        }
+    };
+
+    let stream = NegotiateTls {
+        socket,
+        addr,
+        server_name,
+        config,
+        env,
+        linger,
+        map,
+        start,
+        kernel_start_time,
+        guard,
+    }
+    .negotiate()
+    .await?;
+
+    Ok(stream)
+}
+
+/// Negotiates TLS 1.3 over a pre-existing TCP stream
+#[inline]
+pub async fn connect_tls_with<Sub>(
+    socket: TcpStream,
+    server_name: Name,
+    config: &impl crate::stream::TlsConnectionBuilder,
+    env: &Environment<Sub>,
+    linger: Option<Duration>,
+    // FIXME: Do we really need the map for this?
+    map: &crate::path::secret::Map,
+) -> io::Result<Stream<Sub>>
+where
+    Sub: event::Subscriber + Clone,
+{
+    let start = env.clock().get_time();
+
+    // The peer address is resolved from the provided socket. This is done before arming the guard
+    // below so that a failure here doesn't emit a connect error event for a handshake we never
+    // started.
+    let addr = socket.peer_addr()?;
+
+    // This emits the error event in case this future gets dropped. The TCP connection is already
+    // established, so we begin waiting on the handshake.
+    let guard = DropGuard {
+        env,
+        reason: Some(StreamTcpConnectErrorReason::AbortedPendingHandshake),
+        start,
+    };
+
+    let stream = NegotiateTls {
+        socket,
+        addr,
+        server_name,
+        config,
+        env,
+        linger,
+        map,
+        start,
+        // The TCP connection was established before this call, so there is no TCP connect step to
+        // time: using `start` as the kernel start time reports a zero TCP latency for the TLS
+        // event emitted during negotiation.
+        kernel_start_time: start,
+        guard,
+    }
+    .negotiate()
+    .await?;
+
+    Ok(stream)
+}
+
+/// Negotiates TLS 1.3 over a connected TCP socket and builds the resulting stream.
+///
+/// This is the shared tail of [`connect_tls`] and [`connect_tls_with`]: those functions differ
+/// only in how the socket is obtained.
+struct NegotiateTls<'a, C, Sub>
+where
+    C: crate::stream::TlsConnectionBuilder,
+    Sub: event::Subscriber + Clone,
+{
+    /// A connected TCP socket to negotiate TLS over.
+    socket: TcpStream,
+    /// The peer address of `socket`.
+    addr: SocketAddr,
+    /// The server name to request during the TLS handshake.
+    server_name: Name,
+    /// Builds the s2n-tls connection used for negotiation.
+    config: &'a C,
+    env: &'a Environment<Sub>,
+    /// `SO_LINGER` to apply to `socket`, if any.
+    linger: Option<Duration>,
+    // FIXME: Do we really need the map for this?
+    map: &'a crate::path::secret::Map,
+    /// When the connect attempt began.
+    start: Timestamp,
+    /// When the TCP connection was established. Equal to `start` when the socket was already
+    /// connected by the caller.
+    kernel_start_time: Timestamp,
+    guard: DropGuard<'a, Sub>,
+}
+
+impl<C, Sub> NegotiateTls<'_, C, Sub>
+where
+    C: crate::stream::TlsConnectionBuilder,
+    Sub: event::Subscriber + Clone,
+{
+    #[inline]
+    async fn negotiate(self) -> io::Result<Stream<Sub>> {
+        let NegotiateTls {
+            socket,
+            addr,
+            server_name,
+            config,
+            env,
+            linger,
+            map,
+            start,
+            kernel_start_time,
+            mut guard,
+        } = self;
+
+        // Make sure TCP_NODELAY is set
+        let _ = socket.set_nodelay(true);
+
+        if linger.is_some() {
+            #[allow(deprecated)]
+            let _ = socket.set_linger(linger);
+        }
+
+        let mut connection = config.build_connection(s2n_tls::enums::Mode::Client)?;
+        (*connection).as_mut().set_server_name(&server_name)?;
+
+        let socket = Arc::new(crate::stream::socket::application::Single(socket));
+        let mut connection =
+            crate::stream::tls::S2nTlsConnection::from_connection(socket.clone(), connection)?;
+
+        let res = connection.negotiate(None).await;
+
+        let negotiate_end = env.clock().get_time();
+
+        let remote_address: s2n_quic_core::inet::SocketAddress = addr.into();
+
+        env.endpoint_publisher_with_time(negotiate_end)
+            .on_stream_tls_connect(event::builder::StreamTlsConnect {
+                error: res.is_err(),
+                remote_address: &remote_address,
+                tcp_latency: kernel_start_time.saturating_duration_since(start),
+                tls_latency: negotiate_end.saturating_duration_since(kernel_start_time),
+            });
+
+        if let Err(error) = &res {
+            env.endpoint_publisher_with_time(negotiate_end)
+                .on_stream_tls_connect_error(event::builder::StreamTlsConnectError {
+                    remote_address: &remote_address,
+                    error,
+                });
+        }
+
+        // Return if negotiation failed.
+        res?;
+
+        guard.reason = None;
+
+        // The handshake is complete at this point, so the stream should be considered open.
+        // Eventually at this point we'll want to export the TLS keys from the connection and add
+        // those into the state below. Right now though we're continuing to use s2n-tls for
+        // maintaining relevant state.
+
+        crate::stream::tls::build_stream(
+            kernel_start_time,
+            addr,
+            socket,
+            connection,
+            env,
+            map,
+            s2n_quic_core::endpoint::Type::Client,
+        )?
+        .build()
+    }
 }

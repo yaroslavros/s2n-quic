@@ -6,8 +6,8 @@ on:
     branches:
       - main
   schedule:
-    # Run the daily job at 8 AM PST / 3 PM UTC
-    - cron: '0 15 * * *'
+    # Run the daily job at 8 AM PST and 8 PM PST
+    - cron: '0 3,15 * * *'
 
 name: qns
 
@@ -20,7 +20,7 @@ env:
   # up with the changes, though.
   INTEROP_RUNNER_REF: bda2d276de79cd016e4d90fd57ff2d863b05abe5
   # This should be updated when updating wesleyrosenblum/quic-network-simulator
-  NETWORK_SIMULATOR_REF: sha256:e102cb0e4b9457f510faf4ca888b4f7f6211aa109b68bfaaa1aa639059fcfc96
+  NETWORK_SIMULATOR_REF: sha256:8057abbab7a8b382df2504ee7d1a899637eff39148b9cff5b4682580155e6f96
   IPERF_ENDPOINT_REF: sha256:cb50cc8019d45d9cad5faecbe46a3c21dd5e871949819a5175423755a9045106
   WIRESHARK_VERSION: 4.4.2
   CDN: https://dnglbrstg7yg.cloudfront.net
@@ -42,12 +42,17 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       matrix: ${{ steps.implementations.outputs.matrix }}
+      start-time: ${{ steps.start-time.outputs.time }}
     steps:
-      - uses: actions/checkout@v5
+      - name: Record workflow start time
+        id: start-time
+        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - uses: actions/checkout@v7
         with:
           path: s2n-quic
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           repository: marten-seemann/quic-interop-runner
           ref: ${{ env.INTEROP_RUNNER_REF }}
@@ -83,7 +88,7 @@ jobs:
     env:
       RUSTFLAGS: "-g --cfg s2n_internal_dev --cfg s2n_quic_dump_on_panic --cfg s2n_quic_unstable"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -105,7 +110,7 @@ jobs:
           mkdir -p s2n-quic-qns
           cp target/${{ matrix.mode }}/s2n-quic-qns s2n-quic-qns/s2n-quic-qns-${{ matrix.mode }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: s2n-quic-qns-${{ matrix.mode }}
           path: s2n-quic-qns/
@@ -116,21 +121,21 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.env.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           path: s2n-quic
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: s2n-quic-qns-debug
           path: s2n-quic-qns/
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: s2n-quic-qns-release
           path: s2n-quic-qns/
 
-      - uses: docker/setup-docker-action@v4
+      - uses: docker/setup-docker-action@v5
         with: 
           version: version=v26.1.3
 
@@ -148,7 +153,7 @@ jobs:
           docker build . --file Dockerfile --target prebuilt --tag aws/s2n-quic-qns --build-arg tls=s2n-tls
           docker build . --file Dockerfile --target prebuilt --tag aws/s2n-quic-qns-rustls --build-arg tls=rustls
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           repository: marten-seemann/quic-interop-runner
           ref: ${{ env.INTEROP_RUNNER_REF }}
@@ -165,7 +170,7 @@ jobs:
           docker pull "wesleyrosenblum/quic-network-simulator@$NETWORK_SIMULATOR_REF"
           docker pull "martenseemann/quic-interop-iperf-endpoint@$IPERF_ENDPOINT_REF"
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: 3.7
 
@@ -192,6 +197,7 @@ jobs:
         run: |
           # enable IPv6 support
           sudo modprobe ip6table_filter
+          mkdir -p results
           python3 run.py --client ${{ matrix.client }} --server ${{ matrix.server }} --json results/result.json --debug --log-dir results/logs
           mkdir -p results/logs
 
@@ -224,7 +230,7 @@ jobs:
                 $from
           done
 
-      - uses: aws-actions/configure-aws-credentials@v5.1.0
+      - uses: aws-actions/configure-aws-credentials@v6.2.3
         if: github.event_name == 'push' || github.event_name == 'schedule' || github.repository == github.event.pull_request.head.repo.full_name
         with:
           role-to-assume: arn:aws:iam::024603541914:role/GitHubOIDCRole
@@ -245,7 +251,7 @@ jobs:
             aws s3 cp "s3://${{ env.CI_ARTIFACTS_BUCKET }}/$TARGET_SHA" "s3://${{ env.CI_ARTIFACTS_BUCKET }}/$TARGET_LATEST" --recursive
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: interop-${{ matrix.client }}-client-${{ matrix.server }}-server
           path: quic-interop-runner/results/result.json
@@ -259,9 +265,9 @@ jobs:
     runs-on: ubuntu-22.04
     needs: [interop]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           path: results/
 
@@ -322,7 +328,7 @@ jobs:
             results/**/result.json > \
               web/logs/latest/result.json
 
-      - uses: aws-actions/configure-aws-credentials@v5.1.0
+      - uses: aws-actions/configure-aws-credentials@v6.2.3
         if: github.event_name == 'push' || github.event_name == 'schedule' || github.repository == github.event.pull_request.head.repo.full_name
         with:
           role-to-assume: arn:aws:iam::024603541914:role/GitHubOIDCRole
@@ -367,9 +373,9 @@ jobs:
         tls: ["s2n-tls", "rustls"]
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: s2n-quic-qns-debug
 
@@ -393,7 +399,7 @@ jobs:
             server: "s2n-quic-null"
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -419,7 +425,7 @@ jobs:
         with:
           crate: ultraman
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: s2n-quic-qns-release
           path: target/release/
@@ -454,7 +460,7 @@ jobs:
           zip perf.zip **/*.script
           rm -rf **/*.script
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: perf-results-${{ matrix.server }}-${{ matrix.client }}
           path: target/perf/results
@@ -463,14 +469,14 @@ jobs:
     runs-on: ubuntu-22.04
     needs: [perf]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # add any additional perf tests here
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: perf-results-s2n-quic-s2n-quic
           path: perf-results/
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: perf-results-s2n-quic-null-s2n-quic-null
           path: perf-results/
@@ -480,7 +486,7 @@ jobs:
           cd perf-results
           tree -H "." -T "Performance Results" --noreport --charset utf-8 > index.html
 
-      - uses: aws-actions/configure-aws-credentials@v5.1.0
+      - uses: aws-actions/configure-aws-credentials@v6.2.3
         if: github.event_name == 'push' || github.event_name == 'schedule' || github.repository == github.event.pull_request.head.repo.full_name
         with:
           role-to-assume: arn:aws:iam::024603541914:role/GitHubOIDCRole
@@ -517,7 +523,7 @@ jobs:
         attack: ["udp"]
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install rust toolchain
         id: toolchain
@@ -525,7 +531,7 @@ jobs:
           rustup toolchain install stable --profile minimal
           rustup override set stable
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: s2n-quic-qns-debug
 
@@ -576,15 +582,45 @@ jobs:
     if: always() && needs.retry-failures.result == 'skipped'
     needs: [retry-failures, env, s2n-quic-qns, interop, interop-report, h3spec, perf, perf-report, attack]
     steps:
-      - uses: aws-actions/configure-aws-credentials@v5.1.0
-        if: github.event_name != 'pull_request'
+      - uses: aws-actions/configure-aws-credentials@v6.2.3
+        if: github.event_name == 'push' || github.event_name == 'schedule' || github.repository == github.event.pull_request.head.repo.full_name
         with:
           role-to-assume: arn:aws:iam::003495580562:role/GitHubOIDCRole
           role-session-name: S2nQuicGHASession
           aws-region: us-west-2
+
       - name: Report daily qns run to CloudWatch
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'push' || github.event_name == 'schedule' || github.repository == github.event.pull_request.head.repo.full_name
         run: |
           METRIC_VALUE=${{ contains(needs.*.result, 'failure') && '1' || '0' }}
           aws cloudwatch put-metric-data --namespace "Github" --metric-name "ActionCIFailure" \
             --value $METRIC_VALUE --dimensions Initiator=${{github.event_name}} --timestamp $(date +%s)
+
+      - name: Calculate workflow duration
+        run: |
+          START_TIME=${{ needs.env.outputs.start-time }}
+          END_TIME=$(date +%s)
+          DURATION_SECONDS=$((END_TIME - START_TIME))
+          DURATION_MINUTES=$(echo "scale=2; $DURATION_SECONDS / 60" | bc)
+          CI_STATUS="${{ contains(needs.*.result, 'failure') && 'failure' || 'success' }}"
+          
+          echo "Workflow duration: $DURATION_MINUTES minutes"
+          echo "CI Status: $CI_STATUS"
+          echo "Event type: ${{ github.event_name }}"
+          
+          # Save for next step
+          echo "DURATION_MINUTES=$DURATION_MINUTES" >> $GITHUB_ENV
+          echo "CI_STATUS=$CI_STATUS" >> $GITHUB_ENV
+          echo "END_TIME=$END_TIME" >> $GITHUB_ENV
+
+      - name: Report workflow duration to CloudWatch
+        if: github.event_name == 'push' || github.event_name == 'schedule' || github.repository == github.event.pull_request.head.repo.full_name
+        run: |
+          aws cloudwatch put-metric-data \
+            --namespace "Github" \
+            --metric-name "ActionQNSDuration" \
+            --value $DURATION_MINUTES \
+            --dimensions Status=$CI_STATUS \
+            --timestamp $END_TIME
+          
+          echo "Successfully reported workflow duration to CloudWatch"

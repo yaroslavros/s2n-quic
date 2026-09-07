@@ -16,49 +16,39 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use tokio::io::{unix::AsyncFd, Interest, Ready};
+use tokio::io::{unix::AsyncFd, Interest};
 
 const BUFFER_SIZE: usize = u16::MAX as usize;
 
 #[derive(Clone)]
 pub struct Receiver {
-    async_fd: Arc<AsyncFd<OwnedFd>>,
+    socket_fd: Arc<AsyncFd<OwnedFd>>,
     socket_path: PathBuf,
 }
 
 impl Receiver {
     pub fn new(socket_path: &Path) -> Result<Self, std::io::Error> {
+        let _ = unlink(socket_path); // Required in case drop did not run previously
         let socket = UnixDatagram::bind(socket_path)?;
         socket.set_nonblocking(true)?;
 
         let async_fd = Arc::new(AsyncFd::new(OwnedFd::from(socket))?);
 
         Ok(Self {
-            async_fd,
+            socket_fd: async_fd,
             socket_path: socket_path.to_path_buf(),
         })
     }
 
     pub async fn receive_msg(&self) -> Result<(Vec<u8>, OwnedFd), std::io::Error> {
-        loop {
-            let mut guard = self.async_fd.ready(Interest::READABLE).await?;
-
-            match self.try_receive_nonblocking() {
-                Ok(result) => {
-                    return Ok(result);
-                }
-                Err(nix::Error::EAGAIN) => {
-                    guard.clear_ready_matching(Ready::READABLE);
-                    continue;
-                }
-                Err(e) => {
-                    return Err(std::io::Error::from(e));
-                }
-            }
-        }
+        let res = self
+            .socket_fd
+            .async_io(Interest::READABLE, |_inner| self.try_receive_nonblocking())
+            .await?;
+        Ok(res)
     }
 
-    fn try_receive_nonblocking(&self) -> Result<(Vec<u8>, OwnedFd), nix::Error> {
+    fn try_receive_nonblocking(&self) -> Result<(Vec<u8>, OwnedFd), std::io::Error> {
         let mut buffer = [0u8; BUFFER_SIZE];
         let mut cmsg_buffer = nix::cmsg_space!([RawFd; 1]);
         let mut iov = [std::io::IoSliceMut::new(&mut buffer)];
@@ -70,7 +60,7 @@ impl Receiver {
         let recv_flags = MsgFlags::empty();
 
         let msg = recvmsg::<UnixAddr>(
-            self.async_fd.as_raw_fd(),
+            self.socket_fd.as_raw_fd(),
             &mut iov,
             Some(&mut cmsg_buffer),
             recv_flags,
@@ -81,6 +71,12 @@ impl Receiver {
             packet_data.extend_from_slice(iov_slice);
         }
 
+        // NOTE: In nix 0.31.x, cmsgs() returns Err(ENOBUFS) if MSG_CTRUNC is set
+        // (i.e., the cmsg buffer was too small). If that happens, any FDs the kernel
+        // already installed into our fd table will be leaked since we never wrap them
+        // in OwnedFd. This can only be triggered by a local sender crafting a message
+        // with more FDs than our buffer expects, so we accept the leak rather than
+        // adding unsafe raw-cmsg parsing.
         for cmsg in msg.cmsgs()? {
             if let ControlMessageOwned::ScmRights(fds) = cmsg {
                 if let Some(&fd) = fds.first() {
@@ -98,22 +94,27 @@ impl Receiver {
                 }
             }
         }
-
-        Err(nix::Error::EINVAL) // No file descriptor found
+        Err(std::io::Error::from(nix::Error::EINVAL)) // No file descriptor found
     }
 }
 
 impl Drop for Receiver {
     fn drop(&mut self) {
-        let _ = unlink(&self.socket_path);
+        // Only unlink if we are the last one to drop.
+        //
+        // Note that there's no race condition as we have unique ownership of the Arc - it's never
+        // actually cloned outside of Receiver today.
+        if Arc::strong_count(&self.socket_fd) == 1 {
+            let _ = unlink(&self.socket_path);
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::uds::sender::Sender;
-    use std::{io::Read as _, os::fd::AsFd as _, path::Path};
+    use crate::uds::sender::{SendMsg, Sender};
+    use std::{io::Read as _, path::Path};
     use tokio::{
         fs::File,
         io::AsyncWriteExt,
@@ -125,7 +126,7 @@ mod tests {
         let receiver_path = Path::new("/tmp/receiver.sock");
 
         let receiver = Receiver::new(receiver_path).unwrap();
-        let sender = Sender::new().unwrap();
+        let sender = Sender::new(receiver_path).unwrap();
 
         let file_path = "/tmp/test.txt";
         let mut file = File::create(file_path).await.unwrap();
@@ -134,9 +135,9 @@ mod tests {
         file.sync_all().await.unwrap();
 
         let file = std::fs::File::open(file_path).unwrap();
-        let fd_to_send = file.as_fd();
 
         let packet_data = b"test packet data";
+        let send_future = SendMsg::new(sender, packet_data.to_vec(), OwnedFd::from(file));
 
         let result = tokio::try_join!(
             async {
@@ -144,7 +145,7 @@ mod tests {
                     .await
                     .unwrap()
             },
-            sender.send_msg(packet_data, receiver_path, fd_to_send)
+            send_future
         );
 
         match result {
@@ -156,10 +157,48 @@ mod tests {
                 assert_eq!(read_buffer, test_data);
             }
             Err(e) => {
-                panic!("Error: {}", e);
+                panic!("Error: {e}");
             }
         }
 
         tokio::fs::remove_file(file_path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_drop_clone_does_not_unlink_socket() {
+        let receiver_path = Path::new("/tmp/receiver_clone_drop.sock");
+        let _ = std::fs::remove_file(receiver_path);
+
+        let receiver = Receiver::new(receiver_path).unwrap();
+        assert!(receiver_path.exists());
+
+        let clone = receiver.clone();
+        drop(clone);
+
+        assert!(
+            receiver_path.exists(),
+            "socket path was unlinked when a clone was dropped"
+        );
+
+        // The original should still be functional
+        let sender = Sender::new(receiver_path).unwrap();
+        let file = std::fs::File::open("/dev/null").unwrap();
+        let send_future = SendMsg::new(sender, b"ping".to_vec(), OwnedFd::from(file));
+
+        let result = tokio::try_join!(
+            async {
+                timeout(Duration::from_secs(2), receiver.receive_msg())
+                    .await
+                    .unwrap()
+            },
+            send_future
+        );
+        assert!(result.is_ok());
+
+        drop(receiver);
+        assert!(
+            !receiver_path.exists(),
+            "socket path was not unlinked after last receiver dropped"
+        );
     }
 }

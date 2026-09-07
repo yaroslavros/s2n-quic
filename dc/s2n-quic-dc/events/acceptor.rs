@@ -13,6 +13,7 @@ struct AcceptorTcpStarted<'a> {
     local_address: SocketAddress<'a>,
 
     /// The backlog size
+    #[measure("backlog")]
     backlog: usize,
 }
 
@@ -141,6 +142,80 @@ struct AcceptorTcpPacketReceived<'a> {
     sojourn_time: core::time::Duration,
 }
 
+/// Emitted when a TLS ClientHello has been recognized on the TCP stream
+#[event("acceptor:tcp:tls_started")]
+#[subject(endpoint)]
+struct AcceptorTcpTlsStarted<'a> {
+    /// The address of the packet's sender
+    #[builder(&'a s2n_quic_core::inet::SocketAddress)]
+    remote_address: SocketAddress<'a>,
+
+    /// The amount of time the TCP stream spent in the queue so far
+    #[timer("sojourn_time")]
+    sojourn_time: core::time::Duration,
+}
+
+/// Emitted when a TLS stream is enqueued to the application accept queue
+#[event("acceptor:tcp:tls_stream_enqueued")]
+#[subject(endpoint)]
+struct AcceptorTcpTlsStreamEnqueued<'a> {
+    /// The address of the packet's sender
+    #[builder(&'a s2n_quic_core::inet::SocketAddress)]
+    remote_address: SocketAddress<'a>,
+
+    /// The amount of time the TCP stream spent on handshaking before enqueuing to the application
+    /// since being accepted from the kernel
+    #[timer("sojourn_time")]
+    sojourn_time: core::time::Duration,
+}
+
+/// Emitted when a TLS stream is rejected
+#[event("acceptor:tcp:tls_stream_rejected")]
+#[subject(endpoint)]
+struct AcceptorTcpTlsStreamRejected<'a> {
+    /// The address of the packet's sender
+    #[builder(&'a s2n_quic_core::inet::SocketAddress)]
+    remote_address: SocketAddress<'a>,
+
+    /// The local address of the server
+    #[builder(&'a s2n_quic_core::inet::SocketAddress)]
+    local_address: SocketAddress<'a>,
+
+    /// The amount of time the TCP stream spent on handshaking before being rejected
+    /// since being accepted from the kernel
+    #[timer("sojourn_time")]
+    sojourn_time: core::time::Duration,
+
+    /// The error encountered
+    #[builder(&'a std::io::Error)]
+    error: &'a std::io::Error,
+}
+
+/// Emitted when a synthetic TLS stream is rejected.
+///
+/// These are TLS streams detected as coming from a synthetic source (e.g., scanner for endpoint
+/// compliance). Typically failures here are expected at a much higher rate.
+#[event("acceptor:tcp:tls_synthetic_stream_rejected")]
+#[subject(endpoint)]
+struct AcceptorTcpSyntheticTlsStreamRejected<'a> {
+    /// The address of the packet's sender
+    #[builder(&'a s2n_quic_core::inet::SocketAddress)]
+    remote_address: SocketAddress<'a>,
+
+    /// The local address of the server
+    #[builder(&'a s2n_quic_core::inet::SocketAddress)]
+    local_address: SocketAddress<'a>,
+
+    /// The amount of time the TCP stream spent on handshaking before being rejected
+    /// since being accepted from the kernel
+    #[timer("sojourn_time")]
+    sojourn_time: core::time::Duration,
+
+    /// The error encountered
+    #[builder(&'a std::io::Error)]
+    error: &'a std::io::Error,
+}
+
 /// Emitted when the TCP acceptor received an invalid initial packet
 #[event("acceptor:tcp:packet_dropped")]
 #[subject(endpoint)]
@@ -190,12 +265,36 @@ struct AcceptorTcpIoError<'a> {
     /// The error encountered
     #[builder(&'a std::io::Error)]
     error: &'a std::io::Error,
+
+    #[nominal_counter("source")]
+    source: AcceptorTcpIoErrorSource,
+}
+
+enum AcceptorTcpIoErrorSource {
+    /// Problem during accept of the TCP socket
+    Accept,
+    /// Problem writing to the TCP socket
+    Send,
+    /// Kernel originating from sending the TCP socket over UDS
+    UnixSend,
+    /// Problem reading from the TCP socket
+    Recv,
+    /// Something within dcQUIC failed related to the remote state or network contents (e.g.,
+    /// parsing the packet)
+    Remote,
+    /// Something in the local application state was wrong.
+    Local,
+    /// Unknown path secret for remote stream.
+    UnknownPathSecret,
+    /// Something went wrong that we didn't expect to happen.
+    /// This is used for failures that aren't expected to relate to dcQUIC state at all.
+    System,
 }
 
 /// Emitted when the TCP stream has been sent over a Unix domain socket
 #[event("acceptor:tcp:socket_sent")]
 #[subject(endpoint)]
-struct AcceptorTcpSocketSent<'a>   {
+struct AcceptorTcpSocketSent<'a> {
     /// The credential ID of the stream
     #[snapshot("[HIDDEN]")]
     credential_id: &'a [u8],
@@ -220,11 +319,11 @@ struct AcceptorTcpSocketSent<'a>   {
 /// Emitted when a TCP stream has been received from a Unix domain socket
 #[event("acceptor:tcp:socket_received")]
 #[subject(endpoint)]
-struct AcceptorTcpSocketReceived<'a>   {
+struct AcceptorTcpSocketReceived<'a> {
     /// The address of the stream's peer
     #[builder(&'a s2n_quic_core::inet::SocketAddress)]
     remote_address: SocketAddress<'a>,
-    
+
     /// The credential ID of the stream
     #[snapshot("[HIDDEN]")]
     credential_id: &'a [u8],
@@ -383,10 +482,14 @@ struct AcceptorStreamDequeued<'a> {
     /// The ID of the stream
     stream_id: u64,
 
-    /// The amount of time that the stream spent in the accept queue before
-    /// being dequeued
+    /// The amount of time that the stream spent in dcQUIC before being dequeued
     #[timer("sojourn_time")]
     sojourn_time: core::time::Duration,
+
+    /// The amount of time that the stream spent in the queue to the application before being
+    /// dequeued
+    #[timer("queue_sojourn_time")]
+    queue_sojourn_time: core::time::Duration,
 }
 
 enum AcceptorPacketDropReason {

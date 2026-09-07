@@ -12,17 +12,23 @@ To further increase performance, the tests are contained within the `src` folder
 
 ### Platform-specific Tests
 
-Some tests in this crate are platform-specific, particularly those that depend on s2n-tls, which is only available on Unix systems. These tests are conditionally compiled using `cfg[unix]` attributes. For example:
+Some tests in this crate are platform-specific. Most notably, tests that depend on the s2n-tls provider are gated on the `s2n_tls_provider` cfg, which the crate's `build.rs` emits on the targets where s2n-tls builds: unix and Windows with the GNU/MinGW toolchain (but not MSVC). For example:
 
 ```rust
-#[cfg(unix)]
-mod resumption;
-
-#[cfg(not(target_os = "windows"))]
+// Needs the s2n-tls provider (mTLS, the ClientHelloCallback trait, session resumption).
+#[cfg(s2n_tls_provider)]
 mod mtls;
+
+// The s2n-tls `fips` feature depends on aws-lc-fips-sys, which does not build on Windows MinGW.
+#[cfg(unix)]
+mod fips;
+
+// Uses real OS sockets, which conflict with bach's simulated time on Windows.
+#[cfg(not(target_os = "windows"))]
+mod prioritized_socket;
 ```
 
-This approach ensures that tests only run on platforms where their dependencies are available. The Cargo.toml file also includes platform-specific dependencies to support this.
+This ensures tests only build on platforms where their dependencies are available. `Cargo.toml` gates the s2n-tls dependencies to the same targets; keep those in sync with the `s2n_tls_provider` cfg in `build.rs`.
 
 ## Test Structure
 
@@ -126,10 +132,30 @@ Implement the `s2n_quic_core::packet::interceptor::Interceptor` trait and config
 
 ```rust
 let client = Client::builder()
-    .with_io(handle.builder().build().unwrap())?  
-    .with_packet_interceptor(interceptor)?  
+    .with_io(handle.builder().build().unwrap())?
+    .with_event(tracing_events(true, model.clone()))?
+    .with_packet_interceptor(interceptor)?
     .start()?;
 ```
+
+### Blocklist Event Subscriber
+
+The test suite includes a `BlocklistSubscriber` utility that can be used to detect and fail tests when specific unwanted events occur. This subscriber works by panicking when it encounters events that have been added to the blocklist, such as certain types of packet losses.
+
+To use the blocklist subscriber in tests:
+
+```rust
+// Use with a client or server
+let client = Client::builder()
+    .with_io(handle.builder().build().unwrap())?
+    .with_tls(certificates::CERT_PEM)?
+    .with_event(tracing_events(true, model.clone()))?
+    .start()?;
+```
+
+When the `with_blocklist` parameter is set to `true`, the `tracing_events` function returns both the standard tracing subscriber and the blocklist subscriber. The standard subscriber logs events as usual, while the blocklist subscriber will cause a test to fail immediately if a blocklisted event is encountered. If certain unwanted events are expected during the test, switching the `with_blocklist` parameter to false to disable the blocklist feature.
+
+This is particularly useful for tests that need to verify that certain error conditions don't occur, as the test will fail early with a clear error message rather than continuing with potentially incorrect behavior.
 
 ### Common Setup
 

@@ -6,8 +6,7 @@ use crate::{
     event::{self, builder::MtuUpdatedCause, IntoEvent},
     frame, inet,
     packet::number::PacketNumber,
-    path,
-    path::mtu,
+    path::{self, mtu},
     recovery::{congestion_controller, CongestionController},
     time::{timer, Timer, Timestamp},
     transmission,
@@ -513,6 +512,10 @@ pub struct Controller {
     //# sender will continue to use the current PLPMTU, after which it
     //# reenters the Search Phase.
     pmtu_raise_timer: Timer,
+    /// Flag indicating we need to send MtuProbingComplete frame to the peer
+    needs_to_send_completion: bool,
+    /// Flag indicating MtuProbingComplete frame is enabled
+    mtu_probing_complete_support: bool,
 }
 
 impl Controller {
@@ -577,6 +580,19 @@ impl Controller {
             black_hole_counter: Default::default(),
             largest_acked_mtu_sized_packet: None,
             pmtu_raise_timer: Timer::default(),
+            needs_to_send_completion: false,
+            mtu_probing_complete_support: false,
+        }
+    }
+
+    /// Enable MtuProbingComplete Support
+    #[inline]
+    pub fn enable_mtu_probing_complete_support(&mut self) {
+        self.mtu_probing_complete_support = true;
+        // If search is already complete when DC support is enabled,
+        // we need to send the completion frame
+        if self.state.is_search_complete() {
+            self.needs_to_send_completion = true;
         }
     }
 
@@ -619,7 +635,7 @@ impl Controller {
                 // wait for regular MTU probing to be enabled to attempt higher MTUs
                 self.state = State::Disabled;
             } else {
-                self.state = State::SearchComplete;
+                self.set_search_complete();
             }
 
             // Publish an `on_mtu_updated` event since the cause
@@ -729,7 +745,7 @@ impl Controller {
                 } else {
                     // The next probe is within the threshold, so move directly
                     // to the SearchComplete state
-                    self.state = State::SearchComplete;
+                    self.set_search_complete();
                 }
 
                 publisher.on_mtu_updated(event::builder::MtuUpdated {
@@ -829,6 +845,18 @@ impl Controller {
         self.probed_size - self.plpmtu >= PROBE_THRESHOLD
     }
 
+    /// Transitions to SearchComplete state and marks MtuProbingComplete frame as needed if the mtu_probing_complete_support
+    /// transport parameter is set to true.
+    ///
+    /// MtuProbingComplete is not an IETF QUIC frame, so we only send it if dcQUIC is enabled.
+    #[inline]
+    fn set_search_complete(&mut self) {
+        self.state = State::SearchComplete;
+        if self.mtu_probing_complete_support {
+            self.needs_to_send_completion = true;
+        }
+    }
+
     /// Requests a new search to be initiated
     ///
     /// If `last_probe_time` is supplied, the PMTU Raise Timer will be armed as
@@ -842,7 +870,7 @@ impl Controller {
         } else {
             // The next probe size is within the threshold of the current MTU
             // so its not worth additional probing.
-            self.state = State::SearchComplete;
+            self.set_search_complete();
 
             if let Some(last_probe_time) = last_probe_time {
                 self.arm_pmtu_raise_timer(last_probe_time + PMTU_RAISE_TIMER_DURATION);
@@ -868,7 +896,7 @@ impl Controller {
             &mut congestion_controller::PathPublisher::new(publisher, path_id),
         );
         // Cancel any current probes
-        self.state = State::SearchComplete;
+        self.set_search_complete();
         // Arm the PMTU raise timer to try a larger MTU again after a cooling off period
         self.arm_pmtu_raise_timer(now + BLACK_HOLE_COOL_OFF_DURATION);
 
@@ -896,6 +924,10 @@ impl Controller {
             self.pmtu_raise_timer.set(timestamp);
         }
     }
+
+    pub fn completion_transmission_needed(&self) -> bool {
+        self.needs_to_send_completion
+    }
 }
 
 impl timer::Provider for Controller {
@@ -907,20 +939,26 @@ impl timer::Provider for Controller {
     }
 }
 
-impl transmission::Provider for Controller {
-    /// Queries the component for any outgoing frames that need to get sent
-    ///
-    /// This method assumes that no other data (other than the packet header) has been written
-    /// to the supplied `WriteContext`. This necessitates the caller ensuring the probe packet
-    /// written by this method to be in its own connection transmission.
+impl Controller {
+    /// Returns `true` when the controller wants to send an MTU probe packet.
     #[inline]
-    fn on_transmit<W: transmission::Writer>(&mut self, context: &mut W) {
+    pub fn probe_needed(&self) -> bool {
+        self.state == State::SearchRequested
+    }
+
+    /// Transmits an MTU probe packet (PING + PADDING).
+    ///
+    /// This should only be called in `MtuProbing` mode. It assumes no other data
+    /// (other than the packet header) has been written to the supplied context,
+    /// so the caller must ensure the probe packet is in its own connection transmission.
+    #[inline]
+    pub fn on_transmit_probe<W: transmission::Writer>(&mut self, context: &mut W) {
+        ensure!(context.transmission_mode().is_mtu_probing());
+
         //= https://www.rfc-editor.org/rfc/rfc8899#section-5.2
         //# When used with an acknowledged PL (e.g., SCTP), DPLPMTUD SHOULD NOT continue to
         //# generate PLPMTU probes in this state.
         ensure!(self.state == State::SearchRequested);
-
-        ensure!(context.transmission_mode().is_mtu_probing());
 
         // Each packet contains overhead in the form of a packet header and an authentication tag.
         // This overhead contributes to the overall size of the packet, so the payload we write
@@ -931,7 +969,7 @@ impl transmission::Provider for Controller {
         if context.remaining_capacity() < probe_payload_size {
             // There isn't enough capacity in the buffer to write the datagram we
             // want to probe, so we've reached the maximum pmtu and the search is complete.
-            self.state = State::SearchComplete;
+            self.set_search_complete();
             return;
         }
 
@@ -960,15 +998,34 @@ impl transmission::Provider for Controller {
     }
 }
 
+impl transmission::Provider for Controller {
+    /// Transmits the `MtuProbingComplete` frame.
+    ///
+    /// This only handles the completion notification. MTU probe packets are
+    /// transmitted separately via `on_transmit_probe`.
+    #[inline]
+    fn on_transmit<W: transmission::Writer>(&mut self, context: &mut W) {
+        ensure!(!context.transmission_mode().is_mtu_probing());
+
+        if self.needs_to_send_completion {
+            let frame = frame::MtuProbingComplete::new(self.plpmtu);
+            if context.write_frame(&frame).is_some() {
+                self.needs_to_send_completion = false;
+            }
+        }
+    }
+}
+
 impl transmission::interest::Provider for Controller {
     #[inline]
     fn transmission_interest<Q: transmission::interest::Query>(
         &self,
         query: &mut Q,
     ) -> transmission::interest::Result {
-        match self.state {
-            State::SearchRequested => query.on_new_data(),
-            _ => Ok(()),
+        if self.completion_transmission_needed() || self.probe_needed() {
+            query.on_new_data()?;
         }
+
+        Ok(())
     }
 }

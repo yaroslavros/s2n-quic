@@ -535,7 +535,7 @@ impl<S: 'static + StreamTrait> AbstractStreamManager<S> {
             })
             .unwrap_or(unknown_stream_result);
 
-        // A wakeup is only triggered if the the transmission list is
+        // A wakeup is only triggered if the transmission list is
         // now empty, but was previously not. The edge triggered behavior
         // minimizes the amount of necessary wakeups.
         let require_wakeup = transmission_snapshot != self.transmission_snapshot();
@@ -966,7 +966,7 @@ impl<S: 'static + StreamTrait> stream::Manager for AbstractStreamManager<S> {
         //= type=TODO
         //= tracking-issue=244
         //= feature=Stream concurrency
-        Ok(()) // TODO: Implement me
+        Ok(())
     }
 
     fn on_max_streams(&mut self, frame: &MaxStreams) -> Result<(), transport::Error> {

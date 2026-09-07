@@ -6,9 +6,11 @@ use crate::{
     credentials::Credentials,
     event::{self, IntoEvent as _},
     packet::stream,
+    path::secret::map::ApplicationData,
     stream::{
         recv::shared as recv,
         send::{application, shared as send},
+        tls::S2nTlsConnection,
     },
 };
 use core::{
@@ -72,6 +74,7 @@ where
     pub receiver: recv::State,
     pub sender: send::State,
     pub crypto: Crypto,
+    pub application_data: Option<ApplicationData>,
     pub common: Common<Subscriber, Clk>,
 }
 
@@ -98,10 +101,20 @@ where
 
                 // transition to steady state once the server provided its chosen `queue_id`
                 if let Some(server_queue_id) = remote_queue_id {
-                    self.remote_queue_id
-                        .store(server_queue_id.as_u64(), Ordering::Relaxed);
+                    // only accept queue_ids that can be encoded in a stream Id
+                    if stream::Id::normal(server_queue_id).is_some() {
+                        self.remote_queue_id
+                            .store(server_queue_id.as_u64(), Ordering::Relaxed);
 
-                    let _ = handshake.on_observation_finished();
+                        let _ = handshake.on_observation_finished();
+                    } else {
+                        use event::ConnectionPublisher as _;
+                        self.common.publisher().on_stream_handshake_packet_rejected(
+                            event::builder::StreamHandshakePacketRejected {
+                                reason: event::builder::StreamHandshakePacketRejectedReason::InvalidQueueId,
+                            },
+                        );
+                    }
                 }
             }
             handshake::State::ServerQueueIdObserved => {
@@ -143,11 +156,8 @@ where
     pub fn stream_id(&self) -> stream::Id {
         let queue_id = self.remote_queue_id.load(Ordering::Relaxed);
         // TODO support alternative modes
-        stream::Id {
-            queue_id: unsafe { VarInt::new_unchecked(queue_id) },
-            is_reliable: true,
-            is_bidirectional: true,
-        }
+        stream::Id::normal(unsafe { VarInt::new_unchecked(queue_id) })
+            .expect("queue_id exceeds encoding limit")
     }
 
     #[inline]
@@ -180,6 +190,11 @@ where
             &*self.common.fixed.credentials.get()
         }
     }
+
+    #[inline]
+    pub fn application_data(&self) -> Option<&ApplicationData> {
+        self.application_data.as_ref()
+    }
 }
 
 impl<Sub, C> ops::Deref for Shared<Sub, C>
@@ -209,6 +224,7 @@ where
     pub last_peer_activity: AtomicU64,
     pub closed_halves: AtomicU8,
     pub subscriber: Subscriber<Sub>,
+    pub s2n_connection: Option<S2nTlsConnection>,
     pub clock: Clk,
 }
 

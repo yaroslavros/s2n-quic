@@ -22,7 +22,8 @@ use core::{
     task::{Context, Poll},
 };
 use s2n_quic_core::{
-    buffer, dc,
+    buffer::{self, Reader},
+    dc,
     endpoint::{self, Location},
     ensure,
     inet::SocketAddress,
@@ -208,6 +209,10 @@ impl State {
         Pub: event::ConnectionPublisher,
     {
         let waker = {
+            #[expect(
+                clippy::unwrap_used,
+                reason = "the lock is only poisoned if another thread already panicked while holding it"
+            )]
             let mut inner = self.inner.lock().unwrap();
             inner.receiver.on_error(error, source, publisher);
             inner.application_waker.take()
@@ -470,7 +475,15 @@ impl Inner {
             let res = {
                 let mut out_buf = buffer::duplex::Interposer::new(out_buf, &mut self.reassembler);
 
-                if features.is_stream() {
+                if let Some(conn) = &shared.s2n_connection {
+                    let res = conn.read(&mut self.buffer, &mut out_buf);
+
+                    if res.is_ok() && out_buf.final_offset().is_some() {
+                        let _ = self.receiver.state.on_receive_fin();
+                    }
+
+                    res
+                } else if features.is_stream() {
                     // this opener should never actually be used anywhere. any packets that try to use control
                     // authentication will result in stream closure.
                     let control_opener = &crate::crypto::open::control::stream::Reliable::default();

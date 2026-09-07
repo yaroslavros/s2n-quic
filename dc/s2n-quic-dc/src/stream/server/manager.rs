@@ -1,6 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+//! dcQUIC stream server forwarding accepted streams over Unix Domain Sockets.
+//!
+//! This can be used when a single host has many application processes and wants to share the
+//! dcQUIC credential state across them. Right now, only dcQUIC streams over TCP are supported.
+
 use crate::{
     event,
     stream::{
@@ -24,7 +29,7 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-use tracing::{trace, Instrument as _};
+use tracing::Instrument as _;
 
 #[derive(Clone)]
 pub struct Server<H: Handshake + Clone, S: event::Subscriber + Clone> {
@@ -91,6 +96,10 @@ impl Default for Builder {
             backlog: None,
             workers: None,
             // FIXME: Don't default to a fixed port?
+            #[expect(
+                clippy::unwrap_used,
+                reason = "parsing a compile-time constant socket address that is known valid"
+            )]
             acceptor_addr: "[::]:4444".parse().unwrap(),
             span: None,
             enable_udp: true,
@@ -127,6 +136,10 @@ impl Builder {
             ))
         );
 
+        #[expect(
+            clippy::unwrap_used,
+            reason = "converting the constant 1 to NonZeroUsize is infallible since 1 is non-zero"
+        )]
         let concurrency: usize = self.workers.unwrap_or_else(|| {
             std::thread::available_parallelism()
                 .unwrap_or_else(|_| 1.try_into().unwrap())
@@ -135,7 +148,12 @@ impl Builder {
 
         let backlog: usize = self.backlog.map(NonZeroU16::get).unwrap_or(DEFAULT_BACKLOG) as usize;
 
-        let env = env::Builder::new(subscriber).with_threads(concurrency);
+        // FIXME: This is configuring runtimes that likely won't be used as the manager doesn't do
+        // dataplane I/O. For now, do the easy thing and configure just one thread per threadpool.
+        // In the future we'll want to get rid of them entirely.
+        let env = env::Builder::new(subscriber)
+            .with_threads(1)
+            .with_thread_name_prefix("mgr-dc".into());
 
         let enable_udp_pool = true;
 
@@ -149,11 +167,17 @@ impl Builder {
             // TODO UDP
         }
 
-        // TODO is it better to spawn one current_thread runtime per concurrency?
+        // If we've not enabled UDP support, clamp the # of threads we spawn to the TCP worker
+        // count. No reason to spawn extra threads that would largely just sit idle.
+        let acceptor_concurrency = if self.enable_udp {
+            concurrency
+        } else {
+            concurrency.clamp(1, MAX_TCP_WORKERS)
+        };
         let acceptor_rt: runtime::Shared<S> = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
-            .thread_name("acceptor")
-            .worker_threads(concurrency)
+            .thread_name("mgr-acceptor")
+            .worker_threads(acceptor_concurrency)
             .build()?
             .into();
 
@@ -173,7 +197,7 @@ impl Builder {
         // split the backlog between all of the workers
         // this is only used in TCP, so clamp division to maximum TCP worker concurrency
         let backlog = backlog
-            .div_ceil(concurrency.clamp(0, MAX_TCP_WORKERS))
+            .div_ceil(acceptor_concurrency.clamp(0, MAX_TCP_WORKERS))
             .max(1);
         let path = self.socket_path.ok_or(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -186,7 +210,7 @@ impl Builder {
             accept_flavor: self.accept_flavor,
             linger: self.linger,
             backlog,
-            concurrency,
+            concurrency: acceptor_concurrency,
             server: &mut server,
             span,
             next_id: 0,
@@ -246,34 +270,15 @@ impl<H: Handshake + Clone, S: event::Subscriber + Clone> Start<'_, H, S> {
     fn spawn_initial_wildcard_pair(&mut self) -> io::Result<()> {
         debug_assert!(self.enable_tcp);
         debug_assert!(self.enable_udp);
-        debug_assert_eq!(self.server.local_addr.port(), 0);
 
-        // try 10 times before bailing
-        for iteration in 0..10 {
-            trace!(wildcard_search_iteration = iteration);
-            let udp_socket = self.socket_opts(self.server.local_addr).build_udp()?;
-            let local_addr = udp_socket.local_addr()?;
-            trace!(candidate = %local_addr);
-            match self.socket_opts(local_addr).build_tcp_listener() {
-                Ok(tcp_socket) => {
-                    trace!(selected = %local_addr);
-                    // we found a port that both protocols can use
-                    self.server.local_addr = local_addr;
-                    self.spawn_udp(udp_socket)?;
-                    self.spawn_tcp(tcp_socket)?;
-                    return Ok(());
-                }
-                Err(err) if err.kind() == io::ErrorKind::AddrInUse => {
-                    // try to find another address
-                    continue;
-                }
-                // bubble up all other error types
-                Err(err) => return Err(err),
-            }
-        }
-
-        // we couldn't find a free port so return and error
-        Err(io::ErrorKind::AddrInUse.into())
+        let (local_addr, udp_socket, tcp_socket) =
+            super::spawn_initial_wildcard_pair(self.server.local_addr, |addr| {
+                self.socket_opts(addr)
+            })?;
+        self.server.local_addr = local_addr;
+        self.spawn_udp(udp_socket)?;
+        self.spawn_tcp(tcp_socket)?;
+        Ok(())
     }
 
     #[inline]
@@ -354,7 +359,7 @@ impl<H: Handshake + Clone, S: event::Subscriber + Clone> Start<'_, H, S> {
         let socket = tokio::io::unix::AsyncFd::new(socket)?;
         let id = self.id();
 
-        let socket_behavior = tcp::worker::SocketBehavior::new(&self.socket_path);
+        let socket_behavior = tcp::worker::SocketBehavior::new(&self.socket_path)?;
         let acceptor = tcp::Acceptor::new(
             id,
             socket,

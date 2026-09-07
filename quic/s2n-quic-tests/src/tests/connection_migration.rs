@@ -13,7 +13,7 @@ fn run_test<F>(mut on_rebind: F)
 where
     F: FnMut(SocketAddr) -> SocketAddr + Send + 'static,
 {
-    let model = Model::default();
+    let model: Model = Model::default();
     let rtt = Duration::from_millis(10);
     let rebind_rate = rtt * 2;
     // we currently only support 4 migrations
@@ -41,11 +41,11 @@ where
     let active_paths = recorder::ActivePathUpdated::new();
     let active_path_sub = active_paths.clone();
 
-    test(model, move |handle| {
+    test(model.clone(), move |handle| {
         let server = Server::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(SERVER_CERTS)?
-            .with_event((tracing_events(), active_path_sub))?
+            .with_event((tracing_events(false, model.clone()), active_path_sub))?
             .with_random(Random::with_seed(456))?
             .start()?;
 
@@ -54,7 +54,7 @@ where
         let client = Client::builder()
             .with_io(client_io)?
             .with_tls(certificates::CERT_PEM)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(false, model.clone()))?
             .with_random(Random::with_seed(456))?
             .start()?;
 
@@ -107,11 +107,11 @@ where
 fn rebind_after_handshake_confirmed() {
     let model = Model::default();
 
-    test(model, move |handle| {
+    test(model.clone(), move |handle| {
         let server = Server::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(SERVER_CERTS)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(false, model.clone()))?
             .with_random(Random::with_seed(456))?
             .with_packet_interceptor(RebindPortBeforeLastHandshakePacket::default())?
             .start()?;
@@ -119,7 +119,7 @@ fn rebind_after_handshake_confirmed() {
         let client = Client::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(certificates::CERT_PEM)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(false, model.clone()))?
             .with_random(Random::with_seed(456))?
             .start()?;
 
@@ -209,6 +209,30 @@ fn rebind_port(mut addr: SocketAddr) -> SocketAddr {
     addr
 }
 
+/// Rebinds the port of an address to a port in a different port scope
+///
+/// The system scope (0-1023) is never used, since migrating in or out of it is denied.
+/// The simulated network only assigns ports in the user and dynamic scopes, so the port
+/// is swapped between those two.
+fn rebind_port_change_scope(mut addr: SocketAddr) -> SocketAddr {
+    //= https://www.rfc-editor.org/rfc/rfc6335#section-6
+    // the first port of the user (1024-49151) and dynamic (49152-65535) scopes
+    const USER_SCOPE: u16 = 1024;
+    const DYNAMIC_SCOPE: u16 = 49152;
+
+    let port = addr.port();
+    let (scope, other_scope) = if port >= DYNAMIC_SCOPE {
+        (DYNAMIC_SCOPE, USER_SCOPE)
+    } else {
+        (USER_SCOPE, DYNAMIC_SCOPE)
+    };
+
+    // move to the other scope, while also advancing the offset into it so each rebind
+    // uses a port that hasn't been used before
+    addr.set_port(other_scope + (port - scope) + 1);
+    addr
+}
+
 #[test]
 fn ip_rebind_test() {
     run_test(rebind_ip);
@@ -224,13 +248,22 @@ fn ip_and_port_rebind_test() {
     run_test(|addr| rebind_ip(rebind_port(addr)));
 }
 
+/// Ensures that migrating between the user and dynamic port scopes is allowed
+#[test]
+fn port_scope_rebind_test() {
+    run_test(rebind_port_change_scope);
+}
+
 // Changes the port of the second datagram received
 #[derive(Default)]
 struct RebindPortBeforeHandshakeConfirmed {
     datagram_count: usize,
 }
 
+// a port in the dynamic scope (49152-65535)
 const REBIND_PORT: u16 = 55555;
+// a port in the system scope (0-1023), which is not in the list of blocked ports
+const SYSTEM_PORT: u16 = 443;
 impl Interceptor for RebindPortBeforeHandshakeConfirmed {
     fn intercept_rx_remote_address(&mut self, _subject: &Subject, addr: &mut RemoteAddress) {
         if (1..5).contains(&self.datagram_count) {
@@ -260,11 +293,11 @@ fn rebind_before_handshake_confirmed() {
     let addr_change_events = subscriber_addr_change.events();
     let subscriber = (subscriber_dropped, subscriber_addr_change);
 
-    test(model, move |handle| {
+    test(model.clone(), move |handle| {
         let server = Server::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(SERVER_CERTS)?
-            .with_event((tracing_events(), subscriber))?
+            .with_event((tracing_events(false, model.clone()), subscriber))?
             .with_random(Random::with_seed(456))?
             .with_packet_interceptor(RebindPortBeforeHandshakeConfirmed::default())?
             .start()?;
@@ -272,7 +305,7 @@ fn rebind_before_handshake_confirmed() {
         let client = Client::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(certificates::CERT_PEM)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(false, model.clone()))?
             .with_random(Random::with_seed(456))?
             .start()?;
 
@@ -327,11 +360,11 @@ fn pto_backoff_exceeding_max_value_closes_connection() {
     let subscriber_closed = recorder::ConnectionClosed::new();
     let connection_closed_events = subscriber_closed.events();
 
-    test(model, move |handle| {
+    test(model.clone(), move |handle| {
         let server = Server::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(SERVER_CERTS)?
-            .with_event((tracing_events(), subscriber_closed))?
+            .with_event((tracing_events(false, model.clone()), subscriber_closed))?
             .with_random(Random::with_seed(456))?
             .with_packet_interceptor(RebindPortAfterTheFirstDatagram::default())?
             .start()?;
@@ -339,7 +372,7 @@ fn pto_backoff_exceeding_max_value_closes_connection() {
         let client = Client::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(certificates::CERT_PEM)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(false, model.clone()))?
             .with_random(Random::with_seed(456))?
             .start()?;
 
@@ -438,11 +471,11 @@ fn rebind_ipv4_mapped_before_handshake_confirmed() {
         let subscriber = recorder::DatagramDropped::new();
         let datagram_dropped_events = subscriber.events();
 
-        test(model, move |handle| {
+        test(model.clone(), move |handle| {
             let server = Server::builder()
                 .with_io(handle.builder().build()?)?
                 .with_tls(SERVER_CERTS)?
-                .with_event((tracing_events(), subscriber))?
+                .with_event((tracing_events(false, model.clone()), subscriber))?
                 .with_random(Random::with_seed(456))?
                 .with_packet_interceptor(interceptor)?
                 .start()?;
@@ -450,7 +483,7 @@ fn rebind_ipv4_mapped_before_handshake_confirmed() {
             let client = Client::builder()
                 .with_io(handle.builder().build()?)?
                 .with_tls(certificates::CERT_PEM)?
-                .with_event(tracing_events())?
+                .with_event(tracing_events(false, model.clone()))?
                 .with_random(Random::with_seed(456))?
                 .start()?;
 
@@ -513,11 +546,11 @@ fn rebind_blocked_port() {
     let subscriber = recorder::DatagramDropped::new();
     let datagram_dropped_events = subscriber.events();
 
-    test(model, move |handle| {
+    test(model.clone(), move |handle| {
         let server = Server::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(SERVER_CERTS)?
-            .with_event((tracing_events(), subscriber))?
+            .with_event((tracing_events(false, model.clone()), subscriber))?
             .with_random(Random::with_seed(456))?
             .with_packet_interceptor(RebindToPort { port: 53, after: 2 })?
             .start()?;
@@ -525,7 +558,7 @@ fn rebind_blocked_port() {
         let client = Client::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(certificates::CERT_PEM)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(false, model.clone()))?
             .with_random(Random::with_seed(456))?
             .start()?;
 
@@ -554,6 +587,90 @@ fn rebind_blocked_port() {
             assert!(matches!(reason, MigrationDenyReason::BlockedPort { .. }));
         }
     }
+}
+
+/// Establishes a connection with the client bound to `client_port` and then makes the
+/// server observe the client migrating to `migrated_port`, asserting that every migration
+/// attempt is denied because the port scope changed
+fn port_scope_change_test(client_port: u16, migrated_port: u16) {
+    let model = Model::default();
+    let subscriber = recorder::DatagramDropped::new();
+    let datagram_dropped_events = subscriber.events();
+
+    test(model.clone(), move |handle| {
+        let server = Server::builder()
+            .with_io(handle.builder().build()?)?
+            .with_tls(SERVER_CERTS)?
+            .with_event((tracing_events(false, model.clone()), subscriber))?
+            .with_random(Random::with_seed(456))?
+            // migrate the client once the handshake has completed
+            .with_packet_interceptor(RebindToPort {
+                port: migrated_port,
+                after: 2,
+            })?
+            .start()?;
+
+        // bind the client before the handshake starts, so the connection is established
+        // on the expected port scope
+        let client_io = handle
+            .builder()
+            .on_socket(move |socket: io::Socket| {
+                let mut addr = socket.local_addr().unwrap();
+                addr.set_port(client_port);
+                socket.rebind(addr);
+            })
+            .build()?;
+
+        let client = Client::builder()
+            .with_io(client_io)?
+            .with_tls(certificates::CERT_PEM)?
+            .with_event(tracing_events(false, model.clone()))?
+            .with_random(Random::with_seed(456))?
+            .start()?;
+
+        let addr = start_server(server)?;
+
+        primary::spawn(async move {
+            let mut connection = client
+                .connect(Connect::new(addr).with_server_name("localhost"))
+                .await
+                .unwrap();
+            let mut stream = connection.open_bidirectional_stream().await.unwrap();
+            let _ = stream.send(Bytes::from_static(b"hello")).await;
+            let _ = stream.finish();
+            let _ = stream.receive().await;
+        });
+
+        Ok(addr)
+    })
+    .unwrap();
+
+    let datagram_dropped_events = datagram_dropped_events.lock().unwrap();
+    let mut denied = 0;
+
+    for event in datagram_dropped_events.iter() {
+        if let DatagramDropReason::RejectedConnectionMigration { reason, .. } = &event.reason {
+            assert!(matches!(
+                reason,
+                MigrationDenyReason::PortScopeChanged { .. }
+            ));
+            denied += 1;
+        }
+    }
+
+    assert!(denied > 0, "the migration attempt should have been denied");
+}
+
+/// Ensures that migrating from a non-system port scope to the system port scope is denied
+#[test]
+fn rebind_system_port_scope() {
+    port_scope_change_test(REBIND_PORT, SYSTEM_PORT);
+}
+
+/// Ensures that migrating from the system port scope to a non-system port scope is denied
+#[test]
+fn rebind_from_system_port_scope() {
+    port_scope_change_test(SYSTEM_PORT, REBIND_PORT);
 }
 
 // Changes the local address after N packets
@@ -588,11 +705,11 @@ fn rebind_server_addr_before_handshake_confirmed() {
     let subscriber = recorder::DatagramDropped::new();
     let datagram_dropped_events = subscriber.events();
 
-    test(model, move |handle| {
+    test(model.clone(), move |handle| {
         let server = Server::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(SERVER_CERTS)?
-            .with_event((tracing_events(), subscriber))?
+            .with_event((tracing_events(false, model.clone()), subscriber))?
             .with_random(Random::with_seed(456))?
             .with_packet_interceptor(RebindAddrAfter { count: 1 })?
             .start()?;
@@ -600,7 +717,7 @@ fn rebind_server_addr_before_handshake_confirmed() {
         let client = Client::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(certificates::CERT_PEM)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(false, model.clone()))?
             .with_random(Random::with_seed(456))?
             .start()?;
 

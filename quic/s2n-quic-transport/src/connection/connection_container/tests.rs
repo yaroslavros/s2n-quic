@@ -14,11 +14,12 @@ use bolero::{check, generator::*};
 use bytes::Bytes;
 use core::{
     any::Any,
+    cell::Cell,
     task::{Context, Poll},
     time::Duration,
 };
 use s2n_quic_core::{
-    application, event,
+    event,
     event::builder::DatagramDropReason,
     inet::{DatagramInfo, SocketAddress},
     io::tx,
@@ -35,6 +36,12 @@ use s2n_quic_core::{
     time::{Timer, Timestamp},
 };
 use std::sync::Mutex;
+
+thread_local! {
+    static CLOSE_CALL_COUNT: Cell<usize> = const { Cell::new(0) };
+    static APPLICATION_CLOSE_CALL_COUNT: Cell<usize> = const { Cell::new(0) };
+    static APPLICATION_CLOSE_WITH_ERROR_COUNT: Cell<usize> = const { Cell::new(0) };
+}
 
 struct TestConnection {
     accept_state: AcceptState,
@@ -90,6 +97,7 @@ impl connection::Trait for TestConnection {
     ) {
         assert!(!self.is_closed);
         assert!(!self.close_timer.is_armed());
+        CLOSE_CALL_COUNT.with(|count| count.set(count.get() + 1));
         self.close_timer.set(timestamp + Duration::from_secs(1));
     }
 
@@ -141,6 +149,8 @@ impl connection::Trait for TestConnection {
         _dc_endpoint: &mut <Self::Config as endpoint::Config>::DcEndpoint,
         _conn_limits_endpoint: &mut <Self::Config as endpoint::Config>::ConnectionLimits,
         _random_generator: &mut <Self::Config as endpoint::Config>::RandomGenerator,
+        _packet_interceptor: &mut <Self::Config as endpoint::Config>::PacketInterceptor,
+        _connection_id_format: &mut <Self::Config as endpoint::Config>::ConnectionIdFormat,
     ) -> Result<(), connection::Error> {
         Ok(())
     }
@@ -150,12 +160,14 @@ impl connection::Trait for TestConnection {
         _datagram: &DatagramInfo,
         _path_id: path::Id,
         _packet: ProtectedInitial,
+        _packet_len: usize,
         _random_generator: &mut <Self::Config as endpoint::Config>::RandomGenerator,
         _subscriber: &mut <Self::Config as endpoint::Config>::EventSubscriber,
         _packet_interceptor: &mut <Self::Config as endpoint::Config>::PacketInterceptor,
         _datagram_endpoint: &mut <Self::Config as endpoint::Config>::DatagramEndpoint,
         _dc_endpoint: &mut <Self::Config as endpoint::Config>::DcEndpoint,
         _conn_limits_endpoint: &mut <Self::Config as endpoint::Config>::ConnectionLimits,
+        _connection_id_format: &<Self::Config as endpoint::Config>::ConnectionIdFormat,
     ) -> Result<(), ProcessingError> {
         Ok(())
     }
@@ -172,6 +184,7 @@ impl connection::Trait for TestConnection {
         _datagram_endpoint: &mut <Self::Config as endpoint::Config>::DatagramEndpoint,
         _dc_endpoint: &mut <Self::Config as endpoint::Config>::DcEndpoint,
         _conn_limits_endpoint: &mut <Self::Config as endpoint::Config>::ConnectionLimits,
+        _connection_id_format: &<Self::Config as endpoint::Config>::ConnectionIdFormat,
     ) -> Result<(), ProcessingError> {
         Ok(())
     }
@@ -182,12 +195,14 @@ impl connection::Trait for TestConnection {
         _datagram: &DatagramInfo,
         _path_id: path::Id,
         _packet: ProtectedHandshake,
+        _packet_len: usize,
         _random_generator: &mut <Self::Config as endpoint::Config>::RandomGenerator,
         _subscriber: &mut <Self::Config as endpoint::Config>::EventSubscriber,
         _packet_interceptor: &mut <Self::Config as endpoint::Config>::PacketInterceptor,
         _datagram_endpoint: &mut <Self::Config as endpoint::Config>::DatagramEndpoint,
         _dc_endpoint: &mut <Self::Config as endpoint::Config>::DcEndpoint,
         _connection_limits_endpoint: &mut <Self::Config as endpoint::Config>::ConnectionLimits,
+        _connection_id_format: &<Self::Config as endpoint::Config>::ConnectionIdFormat,
     ) -> Result<(), ProcessingError> {
         Ok(())
     }
@@ -198,6 +213,7 @@ impl connection::Trait for TestConnection {
         _datagram: &DatagramInfo,
         _path_id: path::Id,
         _packet: ProtectedShort,
+        _packet_len: usize,
         _random_generator: &mut <Self::Config as endpoint::Config>::RandomGenerator,
         _subscriber: &mut <Self::Config as endpoint::Config>::EventSubscriber,
         _packet_interceptor: &mut <Self::Config as endpoint::Config>::PacketInterceptor,
@@ -214,6 +230,7 @@ impl connection::Trait for TestConnection {
         _datagram: &DatagramInfo,
         _path_id: path::Id,
         _packet: ProtectedVersionNegotiation,
+        _packet_len: usize,
         _subscriber: &mut <Self::Config as endpoint::Config>::EventSubscriber,
         _packet_interceptor: &mut <Self::Config as endpoint::Config>::PacketInterceptor,
     ) -> Result<(), ProcessingError> {
@@ -226,6 +243,7 @@ impl connection::Trait for TestConnection {
         _datagram: &DatagramInfo,
         _path_id: path::Id,
         _packet: ProtectedZeroRtt,
+        _packet_len: usize,
         _subscriber: &mut <Self::Config as endpoint::Config>::EventSubscriber,
         _packet_interceptor: &mut <Self::Config as endpoint::Config>::PacketInterceptor,
     ) -> Result<(), ProcessingError> {
@@ -238,6 +256,7 @@ impl connection::Trait for TestConnection {
         _datagram: &DatagramInfo,
         _path_id: path::Id,
         _packet: ProtectedRetry,
+        _packet_len: usize,
         _subscriber: &mut <Self::Config as endpoint::Config>::EventSubscriber,
         _packet_interceptor: &mut <Self::Config as endpoint::Config>::PacketInterceptor,
     ) -> Result<(), ProcessingError> {
@@ -282,7 +301,11 @@ impl connection::Trait for TestConnection {
         _stream_type: Option<stream::StreamType>,
         _context: &Context,
     ) -> Poll<Result<Option<stream::StreamId>, connection::Error>> {
-        todo!()
+        if self.is_closed {
+            return Poll::Ready(Err(connection::Error::unspecified()));
+        }
+
+        Poll::Pending
     }
 
     fn poll_open_stream(
@@ -291,11 +314,20 @@ impl connection::Trait for TestConnection {
         _token: &mut connection::OpenToken,
         _context: &Context,
     ) -> Poll<Result<stream::StreamId, connection::Error>> {
-        todo!()
+        if self.is_closed {
+            return Poll::Ready(Err(connection::Error::unspecified()));
+        }
+
+        Poll::Ready(Ok(stream::StreamId::from_varint(
+            s2n_quic_core::varint::VarInt::from_u8(0),
+        )))
     }
 
-    fn application_close(&mut self, _error: Option<application::Error>) {
-        // no-op
+    fn application_close(&mut self, _error: Option<connection::Error>) {
+        APPLICATION_CLOSE_CALL_COUNT.with(|count| count.set(count.get() + 1));
+        if _error.is_some() {
+            APPLICATION_CLOSE_WITH_ERROR_COUNT.with(|count| count.set(count.get() + 1));
+        }
     }
 
     fn server_name(&self) -> Option<ServerName> {
@@ -615,4 +647,26 @@ fn container_test() {
 
         assert!(connections.next().is_none());
     });
+}
+
+#[test]
+fn drop_closes_all_connections() {
+    APPLICATION_CLOSE_CALL_COUNT.with(|count| count.set(0));
+    APPLICATION_CLOSE_WITH_ERROR_COUNT.with(|count| count.set(0));
+
+    let mut id_gen = InternalConnectionIdGenerator::new();
+    let (_handle, acceptor, connector, _close_handle) = endpoint::handle::Handle::new(100);
+
+    {
+        let mut container: ConnectionContainer<TestConnection, TestLock> =
+            ConnectionContainer::new(acceptor, connector);
+
+        for _ in 0..3 {
+            let id = id_gen.generate_id();
+            container.insert_connection(TestConnection::default(), id);
+        }
+    }
+
+    APPLICATION_CLOSE_CALL_COUNT.with(|count| assert_eq!(count.get(), 3));
+    APPLICATION_CLOSE_WITH_ERROR_COUNT.with(|count| assert_eq!(count.get(), 3));
 }

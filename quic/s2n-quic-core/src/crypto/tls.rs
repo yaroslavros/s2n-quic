@@ -1,11 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::path::{LocalAddress, RemoteAddress};
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
 pub use bytes::{Bytes, BytesMut};
-use core::{any::Any, fmt::Debug};
+use core::{any::Any, fmt::Debug, net::SocketAddr};
 use zerocopy::{FromBytes, IntoBytes, Unaligned};
 
 mod error;
@@ -22,6 +23,25 @@ pub mod slow_tls;
 
 #[cfg(feature = "std")]
 pub mod offload;
+
+/// Holds connection address information for establishing a TLS session.
+/// This includes both the local and remote addresses.
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub struct ConnectionInfo {
+    pub local_address: SocketAddr,
+    pub remote_address: SocketAddr,
+}
+
+impl ConnectionInfo {
+    #[doc(hidden)]
+    pub fn new(local_address: LocalAddress, remote_address: RemoteAddress) -> Self {
+        Self {
+            local_address: local_address.into(),
+            remote_address: remote_address.into(),
+        }
+    }
+}
 
 /// Holds all application parameters which are exchanged within the TLS handshake.
 #[derive(Debug)]
@@ -86,8 +106,26 @@ pub trait TlsSession: Send {
 
     fn cipher_suite(&self) -> CipherSuite;
 
+    /// The signature scheme used to authenticate the server for this connection,
+    /// e.g. `"ecdsa_secp256r1_sha256"`.
+    ///
+    /// Returns `None` when the signature scheme is unavailable, which includes:
+    ///
+    /// * the handshake was a session resumption, so no signature was produced
+    /// * the TLS provider does not expose the negotiated signature scheme
+    fn signature_scheme(&self) -> Option<&'static str> {
+        None
+    }
+
+    // The peer's verified cert chain.
     #[cfg(feature = "alloc")]
     fn peer_cert_chain_der(&self) -> Result<Vec<Vec<u8>>, ChainError>;
+
+    // This is the unverified client cert chain.
+    //
+    // https://docs.rs/s2n-tls/latest/s2n_tls/connection/struct.Connection.html#method.client_cert_chain_bytes
+    #[cfg(feature = "alloc")]
+    fn client_cert_chain_der(&self) -> Result<Option<Vec<u8>>, ChainError>;
 }
 
 #[cfg(feature = "alloc")]
@@ -206,6 +244,7 @@ pub trait Endpoint: 'static + Sized + Send {
     fn new_server_session<Params: s2n_codec::EncoderValue>(
         &mut self,
         transport_parameters: &Params,
+        connection_info: ConnectionInfo,
     ) -> Self::Session;
 
     fn new_client_session<Params: s2n_codec::EncoderValue>(

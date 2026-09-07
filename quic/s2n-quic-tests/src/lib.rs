@@ -1,19 +1,22 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+use rand::{
+    rand_core::{Rng, SeedableRng, TryRng},
+    rngs::ChaCha8Rng,
+    RngExt,
+};
 use s2n_quic::{
     client::Connect,
     provider::{
-        event,
-        io::testing::{primary, spawn, Handle, Result},
+        event::{self, events},
+        io::testing::{primary, spawn, Handle, Model, Result},
     },
     stream::PeerStream,
     Client, Server,
 };
 use s2n_quic_core::{crypto::tls::testing::certificates, havoc, stream::testing::Data};
-
-use rand::{Rng, RngCore};
-use std::net::SocketAddr;
+use std::{collections::HashSet, net::SocketAddr};
 
 pub mod recorder;
 #[cfg(test)]
@@ -21,7 +24,145 @@ mod tests;
 
 pub static SERVER_CERTS: (&str, &str) = (certificates::CERT_PEM, certificates::KEY_PEM);
 
-pub fn tracing_events() -> event::tracing::Subscriber {
+/// A subscriber that panics when a blocklisted event is encountered
+pub struct BlocklistSubscriber {
+    blocklist_enabled: bool,
+    network_env: Model,
+    closed_connections: HashSet<u64>,
+}
+
+impl BlocklistSubscriber {
+    pub fn new(blocklist_enabled: bool, network_env: Model) -> Self {
+        Self {
+            blocklist_enabled,
+            network_env,
+            closed_connections: HashSet::default(),
+        }
+    }
+
+    pub fn max_udp_payload(&self) -> u16 {
+        self.network_env.max_udp_payload()
+    }
+}
+
+impl event::Subscriber for BlocklistSubscriber {
+    type ConnectionContext = ();
+
+    fn create_connection_context(
+        &mut self,
+        _meta: &events::ConnectionMeta,
+        _info: &events::ConnectionInfo,
+    ) -> Self::ConnectionContext {
+    }
+
+    fn on_datagram_dropped(
+        &mut self,
+        _context: &mut Self::ConnectionContext,
+        _meta: &events::ConnectionMeta,
+        event: &events::DatagramDropped,
+    ) {
+        if self.blocklist_enabled {
+            panic!(
+                "Blacklisted datagram dropped event encountered: {:?}",
+                event
+            );
+        }
+    }
+
+    fn on_packet_dropped(
+        &mut self,
+        _context: &mut Self::ConnectionContext,
+        _meta: &events::ConnectionMeta,
+        event: &events::PacketDropped,
+    ) {
+        if matches!(
+            event,
+            events::PacketDropped {
+                reason: events::PacketDropReason::DecryptionFailed { .. }
+                    | events::PacketDropReason::UnprotectFailed { .. }
+                    | events::PacketDropReason::VersionMismatch { .. }
+                    | events::PacketDropReason::UndersizedInitialPacket { .. }
+                    | events::PacketDropReason::InitialConnectionIdInvalidSpace { .. },
+                ..
+            }
+        ) && self.blocklist_enabled
+        {
+            panic!("Blocklisted packet dropped event encountered: {:?}", event);
+        }
+    }
+
+    fn on_packet_lost(
+        &mut self,
+        _context: &mut Self::ConnectionContext,
+        _meta: &events::ConnectionMeta,
+        event: &events::PacketLost,
+    ) {
+        // packet which is smaller than the MTU should not be lost
+        if event.bytes_lost < self.max_udp_payload() && self.blocklist_enabled {
+            panic!("Bytes lost is {} and max udp payload is {}\nBlocklisted packet lost event encountered: {:?}", event.bytes_lost, self.max_udp_payload(), event);
+        }
+    }
+
+    fn on_platform_tx_error(
+        &mut self,
+        _meta: &events::EndpointMeta,
+        event: &events::PlatformTxError,
+    ) {
+        if self.blocklist_enabled {
+            panic!(
+                "Blocklisted platform tx error event encountered: {:?}",
+                event
+            );
+        }
+    }
+
+    fn on_platform_rx_error(
+        &mut self,
+        _meta: &events::EndpointMeta,
+        event: &events::PlatformRxError,
+    ) {
+        if self.blocklist_enabled {
+            panic!(
+                "Blocklisted platform rx error event encountered: {:?}",
+                event
+            );
+        }
+    }
+
+    fn on_endpoint_datagram_dropped(
+        &mut self,
+        _meta: &events::EndpointMeta,
+        event: &events::EndpointDatagramDropped,
+    ) {
+        if self.blocklist_enabled {
+            panic!(
+                "Blocklisted endpoint datagram dropped event encountered: {:?}",
+                event
+            );
+        }
+    }
+
+    fn on_connection_closed(
+        &mut self,
+        _context: &mut Self::ConnectionContext,
+        meta: &events::ConnectionMeta,
+        _event: &events::ConnectionClosed,
+    ) {
+        self.closed_connections.insert(meta.id);
+    }
+
+    fn on_frame_received(
+        &mut self,
+        _context: &mut Self::ConnectionContext,
+        meta: &events::ConnectionMeta,
+        _event: &events::FrameReceived,
+    ) {
+        // Closed connections should not be reading frames
+        assert!(!self.closed_connections.contains(&meta.id));
+    }
+}
+
+pub fn tracing_events(with_blocklist: bool, network_env: Model) -> impl event::Subscriber {
     use std::sync::Once;
 
     static TRACING: Once = Once::new();
@@ -59,7 +200,10 @@ pub fn tracing_events() -> event::tracing::Subscriber {
             .init();
     });
 
-    event::tracing::Subscriber::default()
+    (
+        event::tracing::Subscriber::default(),
+        BlocklistSubscriber::new(with_blocklist, network_env),
+    )
 }
 
 pub fn start_server(mut server: Server) -> Result<SocketAddr> {
@@ -96,22 +240,27 @@ pub fn start_server(mut server: Server) -> Result<SocketAddr> {
     Ok(server_addr)
 }
 
-pub fn server(handle: &Handle) -> Result<SocketAddr> {
-    let server = build_server(handle)?;
+pub fn server(handle: &Handle, network_env: Model) -> Result<SocketAddr> {
+    let server = build_server(handle, network_env)?;
     start_server(server)
 }
 
-pub fn build_server(handle: &Handle) -> Result<Server> {
+pub fn build_server(handle: &Handle, network_env: Model) -> Result<Server> {
     Ok(Server::builder()
         .with_io(handle.builder().build().unwrap())?
         .with_tls(SERVER_CERTS)?
-        .with_event(tracing_events())?
+        .with_event(tracing_events(true, network_env))?
         .with_random(Random::with_seed(123))?
         .start()?)
 }
 
-pub fn client(handle: &Handle, server_addr: SocketAddr) -> Result {
-    let client = build_client(handle)?;
+pub fn client(
+    handle: &Handle,
+    server_addr: SocketAddr,
+    network_env: Model,
+    with_blocklist: bool,
+) -> Result {
+    let client = build_client(handle, network_env, with_blocklist)?;
     start_client(client, server_addr, Data::new(10_000))
 }
 
@@ -146,37 +295,30 @@ pub fn start_client(client: Client, server_addr: SocketAddr, data: Data) -> Resu
     Ok(())
 }
 
-pub fn build_client(handle: &Handle) -> Result<Client> {
+pub fn build_client(handle: &Handle, network_env: Model, with_blocklist: bool) -> Result<Client> {
     Ok(Client::builder()
         .with_io(handle.builder().build().unwrap())?
         .with_tls(certificates::CERT_PEM)?
-        .with_event(tracing_events())?
+        .with_event(tracing_events(with_blocklist, network_env))?
         .with_random(Random::with_seed(123))?
         .start()?)
 }
 
-pub fn client_server(handle: &Handle) -> Result<SocketAddr> {
-    let addr = server(handle)?;
-    client(handle, addr)?;
-    Ok(addr)
-}
-
 pub struct Random {
-    inner: rand_chacha::ChaCha8Rng,
+    inner: ChaCha8Rng,
 }
 
 impl Random {
     pub fn with_seed(seed: u64) -> Self {
-        use rand::SeedableRng;
         Self {
-            inner: rand_chacha::ChaCha8Rng::seed_from_u64(seed),
+            inner: ChaCha8Rng::seed_from_u64(seed),
         }
     }
 }
 
 impl havoc::Random for Random {
     fn fill(&mut self, bytes: &mut [u8]) {
-        self.fill_bytes(bytes);
+        Rng::fill_bytes(&mut self.inner, bytes);
     }
 
     fn gen_range(&mut self, range: std::ops::Range<u64>) -> u64 {
@@ -184,17 +326,20 @@ impl havoc::Random for Random {
     }
 }
 
-impl RngCore for Random {
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.inner.fill_bytes(dest)
+impl TryRng for Random {
+    type Error = core::convert::Infallible;
+
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        Ok(Rng::next_u32(&mut self.inner))
     }
 
-    fn next_u32(&mut self) -> u32 {
-        self.inner.next_u32()
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        Ok(Rng::next_u64(&mut self.inner))
     }
 
-    fn next_u64(&mut self) -> u64 {
-        self.inner.next_u64()
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Self::Error> {
+        Rng::fill_bytes(&mut self.inner, dest);
+        Ok(())
     }
 }
 
@@ -210,15 +355,21 @@ impl s2n_quic::provider::random::Provider for Random {
 
 impl s2n_quic::provider::random::Generator for Random {
     fn public_random_fill(&mut self, dest: &mut [u8]) {
-        self.fill_bytes(dest);
+        Rng::fill_bytes(self, dest);
     }
 
     fn private_random_fill(&mut self, dest: &mut [u8]) {
-        self.fill_bytes(dest);
+        Rng::fill_bytes(self, dest);
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+// mTLS is only wired up for the s2n-tls provider. On the `s2n_tls_provider` targets (unix and
+// Windows GNU/MinGW) `tls::default` resolves to s2n-tls, so gate on that cfg and go through the
+// default provider.
+//
+// TODO: https://github.com/aws/s2n-quic/issues/1726
+// Build the rustls provider with mTLS enabled so these tests can run against either provider.
+#[cfg(s2n_tls_provider)]
 mod mtls {
     use super::*;
     use s2n_quic::provider::tls;
@@ -269,7 +420,8 @@ mod slow_tls {
     }
 }
 
-#[cfg(unix)]
+// Session resumption is only wired up for the s2n-tls provider.
+#[cfg(s2n_tls_provider)]
 pub mod resumption {
     use super::*;
     use s2n_quic::provider::tls::{
@@ -348,7 +500,7 @@ pub mod resumption {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(s2n_tls_provider)]
 pub use mtls::*;
 
 pub use slow_tls::SlowTlsProvider;

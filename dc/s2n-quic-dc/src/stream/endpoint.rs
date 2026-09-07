@@ -4,7 +4,7 @@
 use crate::{
     event::{self, api::Subscriber as _, IntoEvent as _},
     packet,
-    path::secret::{self, map, Map},
+    path::secret::{self, map, map::ApplicationData, Map},
     random::Random,
     stream::{
         self, application,
@@ -34,6 +34,10 @@ pub struct AcceptError {
 }
 
 #[inline]
+#[expect(
+    clippy::unwrap_used,
+    reason = "VarInt::ZERO is a constant that is always a valid normal stream Id"
+)]
 pub fn open_stream<Env, P>(
     env: &Env,
     entry: map::Peer,
@@ -50,12 +54,8 @@ where
         parameters = o(parameters);
     }
 
-    let stream_id = packet::stream::Id {
-        // the client starts with routing to 0 until the server updates the value
-        queue_id: VarInt::ZERO,
-        is_reliable: true,
-        is_bidirectional: true,
-    };
+    // the client starts with routing to 0 until the server updates the value
+    let stream_id = packet::stream::Id::normal(VarInt::ZERO).unwrap();
 
     let now = env.clock().get_time();
 
@@ -79,6 +79,7 @@ where
         endpoint::Type::Client,
         subscriber,
         subscriber_ctx,
+        None,
     )
 }
 
@@ -88,10 +89,17 @@ pub fn derive_stream_credentials(
     map: &Map,
     features: &stream::TransportFeatures,
     secret_control: &mut Vec<u8>,
-) -> Result<(secret::map::Bidirectional, dc::ApplicationParams), io::Error> {
+) -> Result<
+    (
+        secret::map::Bidirectional,
+        dc::ApplicationParams,
+        Option<ApplicationData>,
+    ),
+    io::Error,
+> {
     let credentials = &packet.credentials;
 
-    let Some((crypto, parameters)) = map.pair_for_credentials(
+    let Some((crypto, parameters, application_data)) = map.pair_for_credentials(
         credentials,
         packet.source_queue_id,
         features,
@@ -104,12 +112,12 @@ pub fn derive_stream_credentials(
         return Err(error);
     };
 
-    Ok((crypto, parameters))
+    Ok((crypto, parameters, application_data))
 }
 
 #[inline]
 pub fn accept_stream<Env, P>(
-    now: Timestamp,
+    kernel_start_time: Timestamp,
     env: &Env,
     peer: P,
     packet: &server::InitialPacket,
@@ -119,6 +127,7 @@ pub fn accept_stream<Env, P>(
     crypto: secret::map::Bidirectional,
     mut parameters: dc::ApplicationParams,
     secret_control: Vec<u8>,
+    application_data: Option<ApplicationData>,
 ) -> Result<application::Builder<Env::Subscriber>, AcceptError>
 where
     Env: Environment,
@@ -128,17 +137,24 @@ where
         parameters = o(parameters);
     }
 
-    let stream_id = packet::stream::Id {
-        // use the client's `source_queue_id`, if specified
-        queue_id: packet.source_queue_id.unwrap_or(VarInt::ZERO),
-        // inherit the rest of the parameters from the client
-        ..packet.stream_id
+    // use the client's `source_queue_id`, if specified, inheriting the rest from the client
+    let Some(stream_id) = packet
+        .stream_id
+        .with_queue_id(packet.source_queue_id.unwrap_or(VarInt::ZERO))
+    else {
+        return Err(AcceptError {
+            secret_control,
+            error: io::Error::new(
+                io::ErrorKind::InvalidData,
+                "queue_id exceeds encoding limit",
+            ),
+        });
     };
 
     let subscriber = env.subscriber().clone();
 
     let res = build_stream(
-        now,
+        kernel_start_time,
         env,
         peer,
         stream_id,
@@ -148,10 +164,14 @@ where
         endpoint::Type::Server,
         subscriber,
         subscriber_ctx,
+        application_data,
     );
 
     match res {
-        Ok(stream) => Ok(stream),
+        Ok(mut stream) => {
+            stream.app_queue_time = Some(env.clock().get_time());
+            Ok(stream)
+        }
         Err(error) => {
             let error = AcceptError {
                 secret_control,
@@ -164,7 +184,7 @@ where
 
 #[inline]
 fn build_stream<Env, P>(
-    now: Timestamp,
+    kernel_start_time: Timestamp,
     env: &Env,
     peer: P,
     stream_id: packet::stream::Id,
@@ -174,6 +194,7 @@ fn build_stream<Env, P>(
     endpoint_type: endpoint::Type,
     subscriber: Env::Subscriber,
     subscriber_ctx: <Env::Subscriber as event::Subscriber>::ConnectionContext,
+    application_data: Option<ApplicationData>,
 ) -> Result<application::Builder<Env::Subscriber>>
 where
     Env: Environment,
@@ -191,7 +212,7 @@ where
         features,
         recv_buffer,
         endpoint_type,
-        &now,
+        &env.clock(),
     );
 
     let writer = {
@@ -252,7 +273,7 @@ where
             clock: env.clock().clone(),
             gso: env.gso(),
             remote_port: remote_addr.port().into(),
-            remote_queue_id: stream_id.queue_id.as_u64().into(),
+            remote_queue_id: stream_id.queue_id().as_u64().into(),
             local_queue_id: if let Some(id) = source_queue_id {
                 id.as_u64()
             } else {
@@ -267,6 +288,7 @@ where
                 subscriber,
                 context: subscriber_ctx,
             },
+            s2n_connection: None,
         }
     };
 
@@ -285,6 +307,7 @@ where
     let shared = Arc::new(shared::Shared {
         receiver: reader,
         sender: writer.0,
+        application_data,
         common,
         crypto,
     });
@@ -372,7 +395,8 @@ where
         write,
         shared,
         sockets: sockets.application,
-        queue_time: now,
+        kernel_start_time,
+        app_queue_time: None,
     };
 
     Ok(stream)

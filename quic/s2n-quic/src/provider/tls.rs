@@ -6,6 +6,8 @@
 use cfg_if::cfg_if;
 use s2n_quic_core::crypto;
 
+pub use s2n_quic_core::crypto::tls::ConnectionInfo;
+
 pub trait Provider {
     type Server: 'static + crypto::tls::Endpoint;
     type Client: 'static + crypto::tls::Endpoint;
@@ -313,7 +315,7 @@ pub mod s2n_tls {
 #[cfg(feature = "unstable-offload-tls")]
 pub mod offload {
     use super::Provider;
-    use s2n_quic_core::crypto::tls::{offload::OffloadEndpoint, Endpoint};
+    use s2n_quic_core::crypto::tls::offload::OffloadEndpoint;
     pub use s2n_quic_core::crypto::tls::{
         offload::{Executor, ExporterHandler},
         TlsSession,
@@ -351,7 +353,7 @@ pub mod offload {
     }
 
     impl<X, H> OffloadBuilder<(), X, H> {
-        pub fn with_endpoint<E: Endpoint>(self, endpoint: E) -> OffloadBuilder<E, X, H> {
+        pub fn with_endpoint<E: Provider>(self, endpoint: E) -> OffloadBuilder<E, X, H> {
             OffloadBuilder::<E, X, H> {
                 endpoint,
                 executor: self.executor,

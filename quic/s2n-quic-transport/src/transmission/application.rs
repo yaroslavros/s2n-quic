@@ -178,6 +178,13 @@ impl<Config: endpoint::Config> Normal<'_, Config> {
         // complete as soon as possible
         self.dc_manager.on_transmit(context);
 
+        // Transmit the MtuProbingComplete frame if needed. MTU probe packets
+        // are handled separately in MtuProbing mode via on_transmit_probe.
+        self.path_manager
+            .active_path_mut()
+            .mtu_controller
+            .on_transmit(context);
+
         let _ = self.crypto_stream.tx.on_transmit((), context);
 
         //= https://www.rfc-editor.org/rfc/rfc9000#section-8.2
@@ -208,6 +215,18 @@ impl<Config: endpoint::Config> transmission::interest::Provider for Normal<'_, C
         self.path_manager
             .active_path()
             .transmission_interest(query)?;
+        // The MTU controller transmission_interest() function includes the interest for MTU probes,
+        // which are not sent in Normal packets, and the interest for sending the MTUConfirmComplete frame,
+        // which are sent in Normal packets.
+        // We therefore only call the completion_transmission_needed() function here to check interest.
+        if self
+            .path_manager
+            .active_path()
+            .mtu_controller
+            .completion_transmission_needed()
+        {
+            query.on_new_data()?;
+        }
         self.ping.transmission_interest(query)?;
         self.dc_manager.transmission_interest(query)?;
         Ok(())
@@ -221,7 +240,7 @@ pub struct MtuProbe<'a> {
 impl MtuProbe<'_> {
     fn on_transmit<W: WriteContext>(&mut self, context: &mut W) {
         if context.transmission_constraint().can_transmit() {
-            self.mtu_controller.on_transmit(context)
+            self.mtu_controller.on_transmit_probe(context)
         }
     }
 }
@@ -231,7 +250,10 @@ impl transmission::interest::Provider for MtuProbe<'_> {
         &self,
         query: &mut Q,
     ) -> transmission::interest::Result {
-        self.mtu_controller.transmission_interest(query)
+        if self.mtu_controller.probe_needed() {
+            query.on_new_data()?;
+        }
+        Ok(())
     }
 }
 

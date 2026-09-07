@@ -1,6 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+//! dcQUIC streams over UDP dispatch from a central [`Acceptor`] to the per-stream sockets.
+//!
+//! This is typically not used directly but rather wrapped in a Server from one of the other
+//! modules ([`super::tokio`] for most production applications).
+
 use super::{accept, InitialPacket};
 use crate::{
     credentials::Credentials,
@@ -140,7 +145,7 @@ where
         };
 
         let mut secret_control = vec![];
-        let (crypto, parameters) = match endpoint::derive_stream_credentials(
+        let (crypto, parameters, application_data) = match endpoint::derive_stream_credentials(
             &self.packet,
             &self.secrets,
             &TransportFeatures::UDP,
@@ -172,6 +177,7 @@ where
             crypto,
             parameters,
             secret_control,
+            application_data,
         ) {
             Ok(stream) => stream,
             Err(error) => {

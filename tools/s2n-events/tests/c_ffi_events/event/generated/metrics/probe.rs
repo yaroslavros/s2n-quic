@@ -9,6 +9,18 @@ use crate::event::metrics::aggregate::{
     self, info, BoolRecorder, Info, NominalRecorder, Recorder as MetricRecorder,
 };
 use s2n_quic_core::probe::define;
+mod id {
+    #[allow(non_camel_case_types)]
+    #[allow(clippy::upper_case_acronyms)]
+    enum InfoId {
+        BYTE_ARRAY_EVENT,
+        ENUM_EVENT,
+        COUNT_EVENT,
+    }
+    pub const BYTE_ARRAY_EVENT: usize = InfoId::BYTE_ARRAY_EVENT as usize;
+    pub const ENUM_EVENT: usize = InfoId::ENUM_EVENT as usize;
+    pub const COUNT_EVENT: usize = InfoId::COUNT_EVENT as usize;
+}
 mod counter {
     #![allow(non_snake_case)]
     use super::*;
@@ -17,9 +29,9 @@ mod counter {
     impl Recorder {
         pub(crate) fn new(info: &'static Info) -> Self {
             match info.id {
-                0usize => Self(byte_array_event),
-                1usize => Self(enum_event),
-                2usize => Self(count_event),
+                id::BYTE_ARRAY_EVENT => Self(byte_array_event),
+                id::ENUM_EVENT => Self(enum_event),
+                id::COUNT_EVENT => Self(count_event),
                 _ => unreachable!("invalid info: {info:?}"),
             }
         }
@@ -31,11 +43,13 @@ mod counter {
     }
     define!(
         extern "probe" {
-            # [link_name = c_ffi_events__event__counter__byte_array_event]
+            #[link_name = c_ffi_events__event__counter__byte_array_event]
             fn byte_array_event(value: u64);
-            # [link_name = c_ffi_events__event__counter__enum_event]
+            #[link_name =
+        c_ffi_events__event__counter__enum_event]
             fn enum_event(value: u64);
-            # [link_name = c_ffi_events__event__counter__count_event]
+            #[link_name
+        = c_ffi_events__event__counter__count_event]
             fn count_event(value: u64);
         }
     );

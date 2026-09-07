@@ -27,10 +27,13 @@ use s2n_quic_core::{
         id::{ConnectionInfo, Generator},
         InitialId, LocalId, PeerId,
     },
-    crypto::{tls, tls::Endpoint as _, CryptoSuite, InitialKey},
+    crypto::{
+        tls::{self, Endpoint as _},
+        CryptoSuite, InitialKey,
+    },
     datagram::{Endpoint as DatagramEndpoint, PreConnectionInfo},
     dc,
-    dc::Endpoint as _,
+    dc::Endpoint as DcEndpoint,
     endpoint::{limits::Outcome, Limiter as _},
     event::{
         self, supervisor, ConnectionPublisher, EndpointPublisher as _, IntoEvent, Subscriber as _,
@@ -38,13 +41,14 @@ use s2n_quic_core::{
     inet::{datagram, DatagramInfo},
     io::{rx, tx},
     packet::{initial::ProtectedInitial, interceptor::Interceptor, ProtectedPacket},
-    path,
-    path::{mtu, Handle as _},
+    path::{self, mtu, Handle as _},
     random::Generator as _,
     stateless_reset::token::{Generator as _, LEN as StatelessResetTokenLen},
     time::{Clock, Timestamp},
     token::{self, Format},
-    transport::parameters::{ClientTransportParameters, DcSupportedVersions},
+    transport::parameters::{
+        ClientTransportParameters, DcSupportedVersions, MtuProbingCompleteSupport,
+    },
 };
 
 pub mod close;
@@ -221,6 +225,8 @@ impl<Cfg: Config> s2n_quic_core::endpoint::Endpoint for Endpoint<Cfg> {
                     endpoint_context.dc,
                     endpoint_context.connection_limits,
                     endpoint_context.random_generator,
+                    endpoint_context.packet_interceptor,
+                    endpoint_context.connection_id_format,
                 ) {
                     conn.close(
                         error,
@@ -481,6 +487,7 @@ impl<Cfg: Config> Endpoint<Cfg> {
 
         let remote_address = header.path.remote_address();
         let connection_info = ConnectionInfo::new(&remote_address);
+        let buffer_len = buffer.len();
         let (packet, remaining) = if let Ok((packet, remaining)) = ProtectedPacket::decode(
             buffer,
             &connection_info,
@@ -625,12 +632,14 @@ impl<Cfg: Config> Endpoint<Cfg> {
                     &datagram,
                     path_id,
                     packet,
+                    buffer_len - remaining.len(),
                     endpoint_context.random_generator,
                     endpoint_context.event_subscriber,
                     endpoint_context.packet_interceptor,
                     endpoint_context.datagram,
                     endpoint_context.dc,
                     endpoint_context.connection_limits,
+                    endpoint_context.connection_id_format,
                     &mut check_for_stateless_reset,
                 ) {
                     //= https://www.rfc-editor.org/rfc/rfc9000#section-10.2.1
@@ -645,6 +654,7 @@ impl<Cfg: Config> Endpoint<Cfg> {
                         endpoint_context.event_subscriber,
                         endpoint_context.packet_interceptor,
                     );
+                    return Err(());
                 }
 
                 if let Err(err) = conn.handle_remaining_packets(
@@ -1001,6 +1011,7 @@ impl<Cfg: Config> Endpoint<Cfg> {
                     deduplicate,
                 },
             sender,
+            context: application_context,
         } = request;
 
         let internal_connection_id = self.connection_id_generator.generate_id();
@@ -1155,9 +1166,13 @@ impl<Cfg: Config> Endpoint<Cfg> {
             &remote_address,
             true,
         );
+
         let mut event_context = endpoint_context.event_subscriber.create_connection_context(
             &meta.clone().into_event(),
-            &event::builder::ConnectionInfo {}.into_event(),
+            &event::builder::ConnectionInfo {
+                application: application_context.as_deref(),
+            }
+            .into_event(),
         );
 
         let mut transport_parameters = ClientTransportParameters {
@@ -1221,6 +1236,13 @@ impl<Cfg: Config> Endpoint<Cfg> {
         if Cfg::DcEndpoint::ENABLED {
             transport_parameters.dc_supported_versions =
                 DcSupportedVersions::for_client(dc::SUPPORTED_VERSIONS);
+
+            transport_parameters.mtu_probing_complete_support =
+                if endpoint_context.dc.mtu_probing_complete_support() {
+                    MtuProbingCompleteSupport::Enabled
+                } else {
+                    MtuProbingCompleteSupport::Disabled
+                };
         }
 
         //= https://www.rfc-editor.org/rfc/rfc9000#section-7.2
@@ -1282,6 +1304,8 @@ impl<Cfg: Config> Endpoint<Cfg> {
             open_registry,
             limits_endpoint: endpoint_context.connection_limits,
             random_generator: endpoint_context.random_generator,
+            interceptor_endpoint: endpoint_context.packet_interceptor,
+            connection_id_validator: endpoint_context.connection_id_format,
         };
         let connection = <Cfg as crate::endpoint::Config>::Connection::new(connection_parameters)?;
         self.connections

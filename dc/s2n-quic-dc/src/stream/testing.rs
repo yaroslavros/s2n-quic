@@ -138,6 +138,10 @@ macro_rules! dcquic_context {
             pub fn protocol(&self) -> Protocol {
                 self.0.protocol
             }
+
+            pub fn is_plaintext(&self) -> bool {
+                false
+            }
         }
     };
 }
@@ -316,6 +320,10 @@ pub mod tcp {
 
         pub fn protocol(&self) -> Protocol {
             Protocol::Tcp
+        }
+
+        pub fn is_plaintext(&self) -> bool {
+            true
         }
     }
 }
@@ -607,7 +615,9 @@ impl Server {
     }
 
     pub async fn accept(&self) -> io::Result<(Stream, SocketAddr)> {
-        stream_server::accept::accept(&self.receiver, &self.stats).await
+        let (stream, _info, addr) =
+            stream_server::accept::accept(&self.receiver, &self.stats).await?;
+        Ok((stream, addr))
     }
 
     pub fn subscriber(&self) -> Arc<testing::Subscriber> {
@@ -838,7 +848,7 @@ pub mod server {
                         let local_addr = socket.local_addr().unwrap();
                         let socket = ::tokio::io::unix::AsyncFd::new(socket).unwrap();
                         let channel_behavior =
-                            stream_server::tokio::tcp::worker::DefaultBehavior::new(&sender);
+                            stream_server::tokio::tcp::worker::DefaultBehavior::new(&sender, None);
 
                         let acceptor = stream_server::tokio::tcp::Acceptor::new(
                             0,

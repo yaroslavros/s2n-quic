@@ -29,12 +29,20 @@ impl ExporterHandler for Exporter {
     ) -> Option<Box<dyn std::any::Any + Send>> {
         None
     }
+
+    fn on_client_application_params(
+        &mut self,
+        _client_params: s2n_quic_core::crypto::tls::ApplicationParameters,
+        _server_params: &mut Vec<u8>,
+    ) -> Option<std::result::Result<(), s2n_quic_core::transport::Error>> {
+        None
+    }
 }
 
 #[test]
 fn tls() {
     let model = Model::default();
-    test(model, |handle| {
+    test(model.clone(), |handle| {
         let server_endpoint = default::Server::builder()
             .with_certificate(certificates::CERT_PEM, certificates::KEY_PEM)
             .unwrap()
@@ -59,14 +67,14 @@ fn tls() {
 
         let server = Server::builder()
             .with_io(handle.builder().build()?)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(false, model.clone()))?
             .with_tls(server_endpoint)?
             .start()?;
 
         let client = Client::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(client_endpoint)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(false, model.clone()))?
             .start()?;
         let addr = start_server(server)?;
         start_client(client, addr, Data::new(1000))?;
@@ -84,7 +92,7 @@ fn failed_tls_handshake() {
     let connection_closed_event = connection_closed_subscriber.events();
 
     let model = Model::default();
-    test(model, |handle| {
+    test(model.clone(), |handle| {
         let server_endpoint = default::Server::builder()
             .with_certificate(
                 certificates::UNTRUSTED_CERT_PEM,
@@ -113,14 +121,17 @@ fn failed_tls_handshake() {
 
         let server = Server::builder()
             .with_io(handle.builder().build()?)?
-            .with_event((tracing_events(), connection_closed_subscriber))?
+            .with_event((
+                tracing_events(false, model.clone()),
+                connection_closed_subscriber,
+            ))?
             .with_tls(server_endpoint)?
             .start()?;
 
         let client = Client::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(client_endpoint)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(false, model.clone()))?
             .start()?;
         let addr = start_server(server)?;
         primary::spawn(async move {
@@ -141,10 +152,10 @@ fn failed_tls_handshake() {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(s2n_tls_provider)]
 fn mtls() {
     let model = Model::default();
-    test(model, |handle| {
+    test(model.clone(), |handle| {
         let server_endpoint = build_server_mtls_provider(certificates::MTLS_CA_CERT)?;
         let client_endpoint = build_client_mtls_provider(certificates::MTLS_CA_CERT)?;
 
@@ -161,14 +172,14 @@ fn mtls() {
 
         let server = Server::builder()
             .with_io(handle.builder().build()?)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(false, model.clone()))?
             .with_tls(server_endpoint)?
             .start()?;
 
         let client = Client::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(client_endpoint)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(false, model.clone()))?
             .start()?;
         let addr = start_server(server)?;
         start_client(client, addr, Data::new(1000))?;
@@ -179,7 +190,7 @@ fn mtls() {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(s2n_tls_provider)]
 fn async_client_hello() {
     use futures::{ready, FutureExt};
     use s2n_quic::provider::tls::s2n_tls::{
@@ -225,7 +236,7 @@ fn async_client_hello() {
             }
         }
     }
-    test(model, |handle| {
+    test(model.clone(), |handle| {
         let server_endpoint = default::Server::builder()
             .with_certificate(certificates::CERT_PEM, certificates::KEY_PEM)
             .unwrap()
@@ -252,14 +263,14 @@ fn async_client_hello() {
 
         let server = Server::builder()
             .with_io(handle.builder().build()?)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(false, model.clone()))?
             .with_tls(server_endpoint)?
             .start()?;
 
         let client = Client::builder()
             .with_io(handle.builder().build()?)?
             .with_tls(client_endpoint)?
-            .with_event(tracing_events())?
+            .with_event(tracing_events(false, model.clone()))?
             .start()?;
         let addr = start_server(server)?;
         start_client(client, addr, Data::new(1000))?;

@@ -51,6 +51,10 @@ where
         secrets: &secret::Map,
         accept_flavor: accept::Flavor,
     ) -> Self {
+        #[expect(
+            clippy::unwrap_used,
+            reason = "converting the compile-time constant 9000 is infallible since it is a valid non-zero value"
+        )]
         let acceptor = Self {
             sender: sender.clone(),
             socket,
@@ -119,7 +123,7 @@ where
         let peer = env::udp::Owned(remote_addr, recv_buffer);
 
         let mut secret_control = vec![];
-        let (crypto, parameters) = match endpoint::derive_stream_credentials(
+        let (crypto, parameters, application_data) = match endpoint::derive_stream_credentials(
             &packet,
             &self.secrets,
             &TransportFeatures::UDP,
@@ -148,6 +152,7 @@ where
             crypto,
             parameters,
             secret_control,
+            application_data,
         ) {
             Ok(stream) => stream,
             Err(error) => {
@@ -196,7 +201,7 @@ where
 
                 Ok(ControlFlow::Continue(()))
             }
-            Err(_) => {
+            Err(_undelivered_stream) => {
                 debug!("application accept queue dropped; shutting down");
                 Ok(ControlFlow::Break(()))
             }

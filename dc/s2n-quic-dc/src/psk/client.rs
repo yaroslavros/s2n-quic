@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::io::{self, HandshakeFailed};
-use crate::path::secret;
+use crate::{path::secret, psk::io::HandshakeReason};
 use s2n_quic::{
     provider::{event::Subscriber as Sub, tls::Provider as Prov},
     server::Name,
-    Connection,
 };
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::runtime::Runtime;
 use tokio_util::sync::DropGuard;
 
@@ -32,12 +31,11 @@ struct State {
     local_addr: SocketAddr,
 }
 
-fn make_runtime() -> (Arc<Runtime>, DropGuard) {
+fn make_runtime() -> std::io::Result<(Arc<Runtime>, DropGuard)> {
     let runtime = Arc::new(
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
-            .build()
-            .unwrap(),
+            .build()?,
     );
 
     let token = tokio_util::sync::CancellationToken::new();
@@ -47,10 +45,9 @@ fn make_runtime() -> (Arc<Runtime>, DropGuard) {
         .name(String::from("hs-client"))
         .spawn(move || {
             rt.block_on(cancelled);
-        })
-        .unwrap();
+        })?;
 
-    (runtime, token.drop_guard())
+    Ok((runtime, token.drop_guard()))
 }
 
 impl State {
@@ -65,7 +62,7 @@ impl State {
         subscriber: Subscriber,
         builder: Builder<Event>,
     ) -> io::Result<Self> {
-        let (runtime, rt_guard) = make_runtime();
+        let (runtime, rt_guard) = make_runtime()?;
         let guard = runtime.enter();
         let client = io::Client::bind::<Provider, Subscriber, Event>(
             addr,
@@ -100,7 +97,6 @@ impl Provider {
         map: secret::Map,
         tls_materials_provider: Provider,
         subscriber: Subscriber,
-        query_event_callback: fn(&mut Connection, Duration),
         builder: Builder<Event>,
         server_name: Name,
     ) -> io::Result<Self> {
@@ -115,22 +111,17 @@ impl Provider {
 
         // Avoid holding onto the state unintentionally after it's no longer needed.
         let weak = Arc::downgrade(&state);
-        map.register_request_handshake(Box::new(move |peer| {
-            if let Some(state) = weak.upgrade() {
-                let runtime = state.runtime.as_ref().map(|v| &v.0).unwrap();
-                let client = state.client.clone();
-                let server_name = server_name.clone();
-                // Drop the JoinHandle -- we're not actually going to block on the join handle's
-                // result. The future will keep running in the background.
-                runtime.spawn(async move {
-                    if let Err(HandshakeFailed { .. }) = client
-                        .connect(peer, query_event_callback, server_name)
-                        .await
-                    {
-                        // failure has already been logged, no further action required.
-                    }
-                });
-            }
+        map.register_request_handshake(Box::new(move |peer, reason| {
+            let state = weak.upgrade()?;
+            let runtime = state.runtime.as_ref().map(|v| &v.0)?;
+            let client = state.client.clone();
+            let server_name = server_name.clone();
+            Some(runtime.spawn(async move {
+                if let Err(HandshakeFailed { .. }) = client.connect(peer, reason, server_name).await
+                {
+                    // failure has already been logged, no further action required.
+                }
+            }))
         }));
 
         Ok(Self { state })
@@ -143,12 +134,9 @@ impl Provider {
     pub async fn handshake_with(
         &self,
         peer: SocketAddr,
-        query_event_callback: fn(&mut Connection, Duration),
         server_name: Name,
     ) -> std::io::Result<HandshakeKind> {
-        let (_peer, kind) = self
-            .handshake_with_entry(peer, query_event_callback, server_name)
-            .await?;
+        let (_peer, kind) = self.handshake_with_entry(peer, server_name).await?;
         Ok(kind)
     }
 
@@ -160,18 +148,16 @@ impl Provider {
     pub async fn handshake_with_entry(
         &self,
         peer: SocketAddr,
-        query_event_callback: fn(&mut Connection, Duration),
         server_name: Name,
     ) -> std::io::Result<(secret::map::Peer, HandshakeKind)> {
         if let Some(peer) = self.state.map.get_tracked(peer) {
             return Ok((peer, HandshakeKind::Cached));
         }
 
-        // Unconditionally request a background handshake. This schedules any re-handshaking
-        // needed. We put this after get_tracked because that saves us a global lock to check
-        // presence in the map in the happy path.
+        // Ensure that even if the future is dropped a handshake is driven to completion in th
+        // background.
         if self.state.runtime.is_some() {
-            let _ = self.background_handshake_with(peer, query_event_callback, server_name.clone());
+            let _ = self.background_handshake_with(peer, server_name.clone());
         }
 
         let state = self.state.clone();
@@ -180,14 +166,14 @@ impl Provider {
                 .spawn(async move {
                     state
                         .client
-                        .connect(peer, query_event_callback, server_name)
+                        .connect(peer, HandshakeReason::User, server_name)
                         .await
                 })
                 .await??;
         } else {
             state
                 .client
-                .connect(peer, query_event_callback, server_name)
+                .connect(peer, HandshakeReason::User, server_name)
                 .await?;
         }
 
@@ -204,10 +190,14 @@ impl Provider {
 
     /// Handshake with a peer in the background.
     #[inline]
+    #[expect(
+        clippy::panic,
+        clippy::panic_in_result_fn,
+        reason = "the panic is only reachable in the deterministic testing configuration where no runtime is present"
+    )]
     pub fn background_handshake_with(
         &self,
         peer: SocketAddr,
-        query_event_callback: fn(&mut Connection, Duration),
         server_name: Name,
     ) -> std::io::Result<HandshakeKind> {
         if self.state.map.contains(&peer) {
@@ -220,7 +210,7 @@ impl Provider {
             // result. The future will keep running in the background.
             runtime.spawn(async move {
                 if let Err(HandshakeFailed { .. }) = client
-                    .connect(peer, query_event_callback, server_name)
+                    .connect(peer, HandshakeReason::User, server_name)
                     .await
                 {
                     // error already logged
@@ -242,18 +232,16 @@ impl Provider {
     // We duplicate the implementation of this method with handshake_with so that we preserve the fast
     // path (not interacting with the runtime at all) for cached handshakes.
     #[inline]
+    #[expect(
+        clippy::panic,
+        clippy::panic_in_result_fn,
+        reason = "the panic is only reachable in the deterministic testing configuration where no runtime is present"
+    )]
     pub fn blocking_handshake_with(
         &self,
         peer: SocketAddr,
-        query_event_callback: fn(&mut Connection, Duration),
         server_name: Name,
     ) -> std::io::Result<HandshakeKind> {
-        // Unconditionally request a background handshake. This schedules any re-handshaking
-        // needed.
-        if self.state.runtime.is_some() {
-            let _ = self.background_handshake_with(peer, query_event_callback, server_name.clone());
-        }
-
         if self.state.map.contains(&peer) {
             return Ok(HandshakeKind::Cached);
         }
@@ -261,7 +249,7 @@ impl Provider {
         let fut = self
             .state
             .client
-            .connect(peer, query_event_callback, server_name);
+            .connect(peer, HandshakeReason::User, server_name);
         if let Some((runtime, _)) = self.state.runtime.as_ref() {
             runtime.block_on(fut)?
         } else {
@@ -280,7 +268,6 @@ impl Provider {
     pub async fn unconditionally_handshake_with_entry(
         &self,
         peer: SocketAddr,
-        query_event_callback: fn(&mut Connection, Duration),
         server_name: Name,
     ) -> std::io::Result<secret::map::Peer> {
         let state = self.state.clone();
@@ -289,7 +276,7 @@ impl Provider {
                 .spawn(async move {
                     state
                         .client
-                        .connect(peer, query_event_callback, server_name)
+                        .connect(peer, HandshakeReason::User, server_name)
                         .await
                 })
                 .await??;

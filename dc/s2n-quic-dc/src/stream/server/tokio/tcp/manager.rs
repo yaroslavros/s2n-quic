@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    event::{self, EndpointPublisher},
+    event::{self, builder::AcceptorTcpIoErrorSource, EndpointPublisher},
     task::waker,
 };
 use core::{
@@ -157,6 +157,7 @@ where
         cx: &mut W::Context,
         connection_context: W::ConnectionContext,
         publisher: &Pub,
+        queue_time: Timestamp,
         clock: &C,
     ) -> bool
     where
@@ -184,6 +185,7 @@ where
             connection_context,
             publisher,
             clock,
+            queue_time,
         );
 
         self.inner
@@ -242,16 +244,15 @@ where
     }
 
     #[inline]
-    fn poll_worker<Pub, C>(
+    fn poll_worker<Pub>(
         &mut self,
         idx: usize,
         cx: &mut W::Context,
         publisher: &Pub,
-        clock: &C,
+        clock: &impl Clock,
     ) -> ControlFlow<()>
     where
         Pub: EndpointPublisher,
-        C: Clock,
     {
         let mut cf = ControlFlow::Continue(());
 
@@ -270,7 +271,7 @@ where
         };
 
         match res {
-            Ok(ControlFlow::Continue(())) => {
+            Ok(WorkerOutput::RecordSojournTime) => {
                 let now = clock.get_time();
                 // update the accept_time estimate
                 self.sojourn_time.update_rtt(
@@ -281,12 +282,16 @@ where
                     PacketNumberSpace::ApplicationData,
                 );
             }
-            Ok(ControlFlow::Break(())) => {
+            Ok(WorkerOutput::Continue) => {
+                // no-op
+            }
+            Ok(WorkerOutput::Exit) => {
                 cf = ControlFlow::Break(());
             }
-            Err(Some(err)) => publisher
-                .on_acceptor_tcp_io_error(event::builder::AcceptorTcpIoError { error: &err }),
-            Err(None) => {}
+            Err(err) => publisher.on_acceptor_tcp_io_error(event::builder::AcceptorTcpIoError {
+                error: &err.error,
+                source: err.source,
+            }),
         }
 
         // the worker is all done so indicate we have another free slot
@@ -298,10 +303,12 @@ where
     }
 
     #[inline]
-    fn next_worker<C>(&mut self, clock: &C) -> Option<usize>
-    where
-        C: Clock,
-    {
+    #[expect(
+        clippy::unwrap_used,
+        clippy::unwrap_in_result,
+        reason = "if no free worker is available then by_sojourn_time is guaranteed non-empty, so front() is always Some"
+    )]
+    fn next_worker<C: Clock>(&mut self, clock: &C) -> Option<usize> {
         // if we have a free worker then use that
         if let Some(idx) = self.free.pop_front(&mut self.workers) {
             trace!(op = %"next_worker", free = idx);
@@ -370,6 +377,27 @@ where
     }
 }
 
+pub struct WorkerError {
+    pub error: io::Error,
+    pub source: AcceptorTcpIoErrorSource,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum WorkerOutput {
+    /// Worker finished, and we should record how long it took to process this stream to update our
+    /// eviction times.
+    RecordSojournTime,
+
+    /// Worker finished, and sojourn time should not be recorded. This is used for accepted TLS
+    /// streams, which are dispatched to a separate runtime for actual processing. That runtime
+    /// manages its own resources and so we don't track the sojourn times here.
+    Continue,
+
+    /// The worker found state that means we need to shutdown the acceptor as a whole. Currently
+    /// this means the application queue receiver was dropped.
+    Exit,
+}
+
 pub(crate) trait Worker {
     type Context;
     type ConnectionContext;
@@ -383,6 +411,7 @@ pub(crate) trait Worker {
         connection_context: Self::ConnectionContext,
         publisher: &Pub,
         clock: &C,
+        queue_time: Timestamp,
     ) where
         Pub: EndpointPublisher,
         C: Clock;
@@ -393,7 +422,7 @@ pub(crate) trait Worker {
         cx: &mut Self::Context,
         publisher: &Pub,
         clock: &C,
-    ) -> Poll<Result<ControlFlow<()>, Option<io::Error>>>
+    ) -> Poll<Result<WorkerOutput, WorkerError>>
     where
         Pub: EndpointPublisher,
         C: Clock;

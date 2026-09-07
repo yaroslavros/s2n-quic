@@ -49,7 +49,7 @@ pub struct State {
     control_packet_number: u64,
     stream_ack: ack::Space,
     recovery_ack: ack::Space,
-    state: Receiver,
+    pub(crate) state: Receiver,
     idle_timer: Timer,
     idle_timeout: Duration,
     // maintains a stable tick timer to avoid timer churn in the platform timer
@@ -61,6 +61,8 @@ pub struct State {
     error: Option<ErrorState>,
     fin_ack_packet_number: Option<VarInt>,
     features: TransportFeatures,
+    /// For STREAM transports, the next expected stream offset to enforce contiguity.
+    next_expected_stream_offset: VarInt,
 }
 
 impl State {
@@ -107,6 +109,7 @@ impl State {
             error: None,
             fin_ack_packet_number: None,
             features,
+            next_expected_stream_offset: VarInt::ZERO,
         }
     }
 
@@ -248,6 +251,18 @@ impl State {
                 }
                 .err())
             );
+
+            // stream offsets must be contiguous — no gaps allowed
+            let actual_offset = packet.stream_offset().as_u64();
+            let expected_offset = self.next_expected_stream_offset.as_u64();
+            ensure!(
+                actual_offset == expected_offset,
+                Err(error::Kind::OutOfOrder {
+                    expected: expected_offset,
+                    actual: actual_offset,
+                }
+                .err())
+            );
         }
 
         if self.features.is_reliable() {
@@ -375,7 +390,21 @@ impl State {
         let initial = out_buf.buffered_len();
 
         // decrypt and write the packet to the provided buffer
-        out_buf.read_from(&mut packet)?;
+        if let Err(e) = out_buf.read_from(&mut packet) {
+            // Ensure the packet is authentic before resetting the stream
+            //
+            // Note that this may reset the stream regardless (depending on stream type), but it
+            // ensures that we reset with the right error code (e.g., crypto error vs invalid fin).
+            let _ = packet.read_chunk(0)?;
+
+            return Err(e.into());
+        }
+
+        // update the expected stream offset for contiguity enforcement
+        if packet.receiver.features.is_stream() {
+            packet.receiver.next_expected_stream_offset =
+                packet.packet.stream_offset() + packet.packet.payload().len();
+        }
 
         let new = out_buf.buffered_len();
 
@@ -819,6 +848,10 @@ impl State {
         let max_data = frame::MaxData {
             maximum_data: self.max_data,
         };
+        #[expect(
+            clippy::unwrap_used,
+            reason = "a MaxData frame's encoding size is a small constant well below VarInt::MAX"
+        )]
         let max_data_encoding_size: VarInt = max_data.encoding_size().try_into().unwrap();
 
         // compute the recovery ACKs first so we have enough space for those - if we run out, the sender will
@@ -971,6 +1004,10 @@ impl State {
             .connection_close()
             .unwrap_or_else(|| s2n_quic_core::transport::Error::NO_ERROR.into());
 
+        #[expect(
+            clippy::unwrap_used,
+            reason = "a ConnectionClose frame's encoding size is bounded well below VarInt::MAX"
+        )]
         let encoding_size = frame.encoding_size().try_into().unwrap();
 
         let result = control::encoder::encode(

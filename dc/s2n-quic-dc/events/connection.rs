@@ -294,6 +294,39 @@ pub struct StreamTcpConnect {
     latency: core::time::Duration,
 }
 
+/// Tracks TLS stream establishment.
+#[event("stream:tls_connect")]
+#[subject(endpoint)]
+pub struct StreamTlsConnect<'a> {
+    #[bool_counter("error")]
+    error: bool,
+
+    /// The remote address being connected to
+    #[builder(&'a s2n_quic_core::inet::SocketAddress)]
+    remote_address: SocketAddress<'a>,
+
+    // Does not include errors (otherwise we'd need to incorrectly emit zeros on tls_latency).
+    #[timer("tcp_latency")]
+    tcp_latency: core::time::Duration,
+
+    // This includes the error latencies.
+    #[timer("tls_latency")]
+    tls_latency: core::time::Duration,
+}
+
+/// Emitted when a TLS stream connect fails.
+#[event("stream:tls_connect_error")]
+#[subject(endpoint)]
+pub struct StreamTlsConnectError<'a> {
+    /// The remote address being connected to
+    #[builder(&'a s2n_quic_core::inet::SocketAddress)]
+    remote_address: SocketAddress<'a>,
+
+    /// The error encountered
+    #[builder(&'a std::io::Error)]
+    error: &'a std::io::Error,
+}
+
 /// Tracks stream connect where dcQUIC owns the TCP connect().
 #[event("stream:connect")]
 #[subject(endpoint)]
@@ -324,6 +357,9 @@ enum MaybeBoolCounter {
 pub struct StreamConnectError {
     #[nominal_counter("reason")]
     reason: StreamTcpConnectErrorReason,
+
+    #[timer("latency")]
+    latency: core::time::Duration,
 }
 
 /// Note that there's no guarantee of a particular reason if multiple reasons ~simultaneously
@@ -335,10 +371,24 @@ pub enum StreamTcpConnectErrorReason {
     /// Handshake failed to produce credentials.
     Handshake,
 
+    /// Emitted when no psk was cached for the peer.
+    PeerPskMissing,
+
     /// When the connect future is dropped prior to returning any result.
     ///
-    /// Usually indicates a timeout in the application.
-    Aborted,
+    /// This means the TCP connect succeeded, but the handshake hasn't yet by the time the connect
+    /// future was dropped.
+    AbortedPendingHandshake,
+
+    /// When the connect future is dropped prior to returning any result.
+    ///
+    /// The handshake succeeded (or wasn't needed), but the TCP connect hasn't yet finished.
+    AbortedPendingConnect,
+
+    /// When the connect future is dropped prior to returning any result.
+    ///
+    /// Neither the TCP connect or handshake have finished yet.
+    AbortedPendingBoth,
 }
 
 #[event("stream:packet_transmitted")]
@@ -547,6 +597,19 @@ pub struct StreamSenderErrored {
 
     /// The location where the error originated
     source: s2n_quic_core::endpoint::Location,
+}
+
+/// Emitted when a handshake packet is rejected due to an invalid field value
+#[event("stream:handshake_packet_rejected")]
+#[measure_counter("conn")]
+pub struct StreamHandshakePacketRejected {
+    #[nominal_counter("reason")]
+    reason: StreamHandshakePacketRejectedReason,
+}
+
+pub enum StreamHandshakePacketRejectedReason {
+    /// The queue_id exceeds the maximum encodable value
+    InvalidQueueId,
 }
 
 // NOTE - This event MUST come last, since connection-level aggregation depends on it

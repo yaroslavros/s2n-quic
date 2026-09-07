@@ -19,7 +19,18 @@ struct EndpointMeta {
     timestamp: crate::event::Timestamp,
 }
 
-struct ConnectionInfo {}
+struct ConnectionInfo<'a> {
+    application: Option<&'a (dyn core::any::Any + Send + Sync)>,
+}
+
+impl<'a> IntoEvent<&'a (dyn core::any::Any + Send + Sync)>
+    for &'a (dyn core::any::Any + Send + Sync)
+{
+    #[inline]
+    fn into_event(self) -> Self {
+        self
+    }
+}
 
 // https://tools.ietf.org/id/draft-marx-qlog-event-definitions-quic-h3-02#5.3.3
 struct TransportParameters<'a> {
@@ -41,6 +52,7 @@ struct TransportParameters<'a> {
     initial_max_streams_uni: u64,
     max_datagram_frame_size: u64,
     dc_supported_versions: &'a [u32],
+    mtu_probing_complete_support: bool,
 }
 
 struct PreferredAddress<'a> {
@@ -221,11 +233,10 @@ impl<'a> IntoEvent<builder::SocketAddress<'a>> for &'a crate::inet::SocketAddres
     }
 }
 
-#[cfg(feature = "std")]
-impl From<SocketAddress<'_>> for std::net::SocketAddr {
+impl From<SocketAddress<'_>> for core::net::SocketAddr {
     #[inline]
     fn from(address: SocketAddress) -> Self {
-        use std::net;
+        use core::net;
         match address {
             SocketAddress::IpV4 { ip, port } => {
                 let ip = net::IpAddr::V4(net::Ipv4Addr::from(*ip));
@@ -239,11 +250,10 @@ impl From<SocketAddress<'_>> for std::net::SocketAddr {
     }
 }
 
-#[cfg(feature = "std")]
-impl From<&SocketAddress<'_>> for std::net::SocketAddr {
+impl From<&SocketAddress<'_>> for core::net::SocketAddr {
     #[inline]
     fn from(address: &SocketAddress) -> Self {
-        use std::net;
+        use core::net;
         match address {
             SocketAddress::IpV4 { ip, port } => {
                 let ip = net::IpAddr::V4(net::Ipv4Addr::from(**ip));
@@ -308,7 +318,9 @@ impl IntoEvent<builder::EcnCounts> for crate::frame::ack::EcnCounts {
 
 //= https://tools.ietf.org/id/draft-marx-qlog-event-definitions-quic-h3-02#A.7
 enum Frame {
-    Padding,
+    Padding {
+        len: u16,
+    },
     Ping,
     Ack {
         ecn_counts: Option<EcnCounts>,
@@ -371,12 +383,17 @@ enum Frame {
         len: u16,
     },
     DcStatelessResetTokens,
+    MtuProbingComplete {
+        mtu: u16,
+    },
 }
 
 impl IntoEvent<builder::Frame> for &crate::frame::Padding {
     #[inline]
     fn into_event(self) -> builder::Frame {
-        builder::Frame::Padding {}
+        builder::Frame::Padding {
+            len: self.length as u16,
+        }
     }
 }
 
@@ -644,6 +661,7 @@ impl IntoEvent<builder::StreamType> for &crate::stream::StreamType {
 //= https://tools.ietf.org/id/draft-marx-qlog-event-definitions-quic-h3-02#A.2
 //
 //= https://tools.ietf.org/id/draft-marx-qlog-event-definitions-quic-h3-02#A.4
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum PacketHeader {
     Initial { number: u64, version: u32 },
     Handshake { number: u64, version: u32 },
@@ -884,6 +902,17 @@ enum PacketDropReason<'a> {
         path: Path<'a>,
         packet_type: PacketType,
     },
+    /// The packet space for a received packet did not exist and there was not enough space in the
+    /// packet buffer to store it for later processing.
+    PacketBufferOutOfSpace {
+        path: Path<'a>,
+        packet_type: PacketType,
+    },
+    /// The connection has already closed
+    ConnectionClosed {
+        path: Path<'a>,
+        packet_type: PacketType,
+    },
 }
 
 #[deprecated(note = "use on_rx_ack_range_dropped event instead")]
@@ -1063,4 +1092,47 @@ enum DcState {
     NoVersionNegotiated,
     PathSecretsReady,
     Complete,
+}
+
+/// The state the dc handshake state machine reached
+///
+/// Unlike `DcState`, this mirrors the internal `dc::Manager` states so that,
+/// when the handshake does not complete, the exact state it stalled in can be reported.
+enum DcHandshakeState {
+    /// Client path created; TLS not yet far enough to derive secrets
+    InitClient,
+    /// Server path created; TLS not yet far enough to derive secrets
+    InitServer,
+    /// Client derived secrets and sent its `DC_STATELESS_RESET_TOKENS`
+    ClientPathSecretsReady,
+    /// Server derived secrets and is waiting for the client's tokens
+    ServerPathSecretsReady,
+    /// Server received the client's tokens, sent its own, and is waiting for the client's ACK
+    ServerTokensSent,
+    /// Handshake done and map entries finalized
+    Complete,
+}
+
+/// The mode in which a packet is being transmitted
+enum TransmissionMode {
+    /// Loss recovery probing to detect lost packets
+    LossRecoveryProbing,
+    /// Maximum transmission unit probing to determine the path MTU
+    MtuProbing,
+    /// Path validation to verify peer address reachability
+    PathValidationOnly,
+    /// Normal transmission
+    Normal,
+}
+
+impl IntoEvent<builder::TransmissionMode> for crate::transmission::Mode {
+    #[inline]
+    fn into_event(self) -> builder::TransmissionMode {
+        match self {
+            Self::LossRecoveryProbing => builder::TransmissionMode::LossRecoveryProbing {},
+            Self::MtuProbing => builder::TransmissionMode::MtuProbing {},
+            Self::PathValidationOnly => builder::TransmissionMode::PathValidationOnly {},
+            Self::Normal => builder::TransmissionMode::Normal {},
+        }
+    }
 }

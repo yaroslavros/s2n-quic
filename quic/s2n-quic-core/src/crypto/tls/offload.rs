@@ -3,10 +3,10 @@
 use crate::{
     application,
     crypto::{
-        tls::{self, NamedGroup, TlsSession},
+        tls::{self, ApplicationParameters, ConnectionInfo, NamedGroup, TlsSession},
         CryptoSuite,
     },
-    sync::spsc::{channel, Receiver, SendSlice, Sender},
+    sync::spsc::{channel, Receiver, RecvSlice, SendSlice, Sender},
     transport,
 };
 use alloc::{boxed::Box, collections::vec_deque::VecDeque, sync::Arc, vec::Vec};
@@ -19,7 +19,7 @@ pub trait Executor {
     fn spawn(&self, task: impl Future<Output = ()> + Send + 'static);
 }
 
-/// Allows access to the TlsSession on handshake failure and when the exporter secret is ready.
+/// Allows access to TLS handshake details for user configuration.
 pub trait ExporterHandler {
     fn on_tls_handshake_failed(
         &self,
@@ -27,6 +27,11 @@ pub trait ExporterHandler {
         e: &(dyn core::error::Error + Send + Sync + 'static),
     ) -> Option<Box<dyn Any + Send>>;
     fn on_tls_exporter_ready(&self, session: &impl TlsSession) -> Option<Box<dyn Any + Send>>;
+    fn on_client_application_params(
+        &mut self,
+        client_params: ApplicationParameters,
+        server_params: &mut alloc::vec::Vec<u8>,
+    ) -> Option<Result<(), crate::transport::Error>>;
 }
 
 // Most people don't need the TlsSession so we ignore these callbacks by default
@@ -39,10 +44,15 @@ impl ExporterHandler for () {
         None
     }
 
-    fn on_tls_exporter_ready(
-        &self,
-        _session: &impl TlsSession,
-    ) -> Option<Box<dyn std::any::Any + Send>> {
+    fn on_tls_exporter_ready(&self, _session: &impl TlsSession) -> Option<Box<dyn Any + Send>> {
+        None
+    }
+
+    fn on_client_application_params(
+        &mut self,
+        _client_params: ApplicationParameters,
+        _server_params: &mut alloc::vec::Vec<u8>,
+    ) -> Option<Result<(), crate::transport::Error>> {
         None
     }
 }
@@ -76,9 +86,11 @@ where
     fn new_server_session<Params: s2n_codec::EncoderValue>(
         &mut self,
         transport_parameters: &Params,
+        connection_info: ConnectionInfo,
     ) -> Self::Session {
         OffloadSession::new(
-            self.inner.new_server_session(transport_parameters),
+            self.inner
+                .new_server_session(transport_parameters, connection_info),
             &self.executor,
             self.exporter.clone(),
             self.channel_capacity,
@@ -213,6 +225,72 @@ impl<S: tls::Session + 'static> OffloadSession<S> {
     }
 }
 
+/// Drains all pending [`Request`]s from a receive slice, applying each one to the QUIC-side
+/// `context`.
+///
+/// Returns [`Poll::Ready`] once the handshake reaches a terminal state (it either completed via
+/// [`Request::TlsDone`] or failed via [`Request::TlsError`] or a context error), in which case the
+/// caller should propagate the result. Returns [`Poll::Pending`] once the slice is fully drained,
+/// meaning polling should continue.
+#[inline]
+fn process_requests<S, W>(
+    slice: &mut RecvSlice<'_, Request<S>>,
+    context: &mut W,
+) -> Poll<Result<(), transport::Error>>
+where
+    S: tls::Session,
+    W: tls::Context<OffloadSession<S>>,
+{
+    while let Some(request) = slice.pop() {
+        match request {
+            Request::HandshakeKeys(key, header_key) => {
+                context.on_handshake_keys(key, header_key)?;
+            }
+            Request::ServerName(server_name) => context.on_server_name(server_name)?,
+            Request::SendInitial(bytes) => context.send_initial(bytes),
+            Request::ApplicationProtocol(bytes) => {
+                context.on_application_protocol(bytes)?;
+            }
+            Request::KeyExchangeGroup(named_group) => {
+                context.on_key_exchange_group(named_group)?;
+            }
+            Request::OneRttKeys(key, header_key, transport_parameters) => context.on_one_rtt_keys(
+                key,
+                header_key,
+                tls::ApplicationParameters {
+                    transport_parameters: &transport_parameters,
+                },
+            )?,
+            Request::SendHandshake(bytes) => {
+                context.send_handshake(bytes);
+            }
+            Request::HandshakeComplete => {
+                context.on_handshake_complete()?;
+            }
+            Request::TlsDone => {
+                return Poll::Ready(Ok(()));
+            }
+            Request::ZeroRtt(key, header_key, transport_parameters) => {
+                context.on_zero_rtt_keys(
+                    key,
+                    header_key,
+                    tls::ApplicationParameters {
+                        transport_parameters: &transport_parameters,
+                    },
+                )?;
+            }
+            Request::TlsContext(ctx) => {
+                context.on_tls_context(ctx);
+            }
+            Request::SendApplication(transmission) => {
+                context.send_application(transmission);
+            }
+            Request::TlsError(e) => return Poll::Ready(Err(e)),
+        }
+    }
+    Poll::Pending
+}
+
 impl<S: tls::Session> tls::Session for OffloadSession<S> {
     #[inline]
     fn poll<W>(&mut self, context: &mut W) -> Poll<Result<(), transport::Error>>
@@ -225,67 +303,13 @@ impl<S: tls::Session> tls::Session for OffloadSession<S> {
         match self.recv_from_tls.poll_slice(&mut ctx) {
             Poll::Ready(res) => match res {
                 Ok(mut slice) => {
-                    while let Some(request) = slice.pop() {
-                        match request {
-                            Request::HandshakeKeys(key, header_key) => {
-                                context.on_handshake_keys(key, header_key)?;
-                            }
-                            Request::ServerName(server_name) => {
-                                context.on_server_name(server_name)?
-                            }
-                            Request::SendInitial(bytes) => context.send_initial(bytes),
-                            Request::ClientParams(client_params, mut server_params) => context
-                                .on_client_application_params(
-                                    tls::ApplicationParameters {
-                                        transport_parameters: &client_params,
-                                    },
-                                    &mut server_params,
-                                )?,
-                            Request::ApplicationProtocol(bytes) => {
-                                context.on_application_protocol(bytes)?;
-                            }
-                            Request::KeyExchangeGroup(named_group) => {
-                                context.on_key_exchange_group(named_group)?;
-                            }
-                            Request::OneRttKeys(key, header_key, transport_parameters) => context
-                                .on_one_rtt_keys(
-                                key,
-                                header_key,
-                                tls::ApplicationParameters {
-                                    transport_parameters: &transport_parameters,
-                                },
-                            )?,
-                            Request::SendHandshake(bytes) => {
-                                context.send_handshake(bytes);
-                            }
-                            Request::HandshakeComplete => {
-                                context.on_handshake_complete()?;
-                            }
-                            Request::TlsDone => {
-                                return Poll::Ready(Ok(()));
-                            }
-                            Request::ZeroRtt(key, header_key, transport_parameters) => {
-                                context.on_zero_rtt_keys(
-                                    key,
-                                    header_key,
-                                    tls::ApplicationParameters {
-                                        transport_parameters: &transport_parameters,
-                                    },
-                                )?;
-                            }
-                            Request::TlsContext(ctx) => {
-                                context.on_tls_context(ctx);
-                            }
-                            Request::SendApplication(transmission) => {
-                                context.send_application(transmission);
-                            }
-                            Request::TlsError(e) => return Poll::Ready(Err(e)),
-                        }
+                    if let Poll::Ready(res) = process_requests(&mut slice, context) {
+                        return Poll::Ready(res);
                     }
                 }
                 Err(_) => {
                     // For whatever reason the TLS task was cancelled. We cannot continue the handshake.
-                    return Poll::Ready(Err(transport::Error::from(tls::Error::HANDSHAKE_FAILURE)));
+                    return Poll::Ready(Err(TLS_RECV_CHANNEL_DROPPED));
                 }
             },
             Poll::Pending => (),
@@ -328,7 +352,14 @@ impl<S: tls::Session> tls::Session for OffloadSession<S> {
                 }
                 Err(_) => {
                     // For whatever reason the TLS task was cancelled. We cannot continue the handshake.
-                    return Poll::Ready(Err(transport::Error::from(tls::Error::HANDSHAKE_FAILURE)));
+                    // Before returning we make one final attempt to read as the TLS task may have sent
+                    // us a final message in the interim between now and the last read.
+                    if let Poll::Ready(Ok(mut slice)) = self.recv_from_tls.poll_slice(&mut ctx) {
+                        if let Poll::Ready(res) = process_requests(&mut slice, context) {
+                            return Poll::Ready(res);
+                        }
+                    }
+                    return Poll::Ready(Err(TLS_SEND_CHANNEL_DROPPED));
                 }
             },
             Poll::Pending => (),
@@ -360,6 +391,12 @@ struct AllowedToSend {
 const SLICE_ERROR: crate::transport::Error =
     crate::transport::Error::INTERNAL_ERROR.with_reason("Slice is full");
 
+const TLS_SEND_CHANNEL_DROPPED: crate::transport::Error =
+    crate::transport::Error::INTERNAL_ERROR.with_reason("TLS send channel dropped");
+
+const TLS_RECV_CHANNEL_DROPPED: crate::transport::Error =
+    crate::transport::Error::INTERNAL_ERROR.with_reason("TLS recv channel dropped");
+
 #[derive(Debug)]
 struct RemoteContext<'a, Request, H> {
     send_to_quic: SendSlice<'a, Request>,
@@ -378,12 +415,11 @@ impl<S: CryptoSuite, H: ExporterHandler> tls::Context<S> for RemoteContext<'_, R
         client_params: tls::ApplicationParameters,
         server_params: &mut alloc::vec::Vec<u8>,
     ) -> Result<(), crate::transport::Error> {
-        match self.send_to_quic.push(Request::ClientParams(
-            client_params.transport_parameters.to_vec(),
-            server_params.to_vec(),
-        )) {
-            Ok(_) => return Ok(()),
-            Err(_) => self.error = Some(SLICE_ERROR),
+        if let Some(result) = self
+            .exporter_handler
+            .on_client_application_params(client_params, server_params)
+        {
+            result?
         }
         Ok(())
     }
@@ -493,8 +529,8 @@ impl<S: CryptoSuite, H: ExporterHandler> tls::Context<S> for RemoteContext<'_, R
         &mut self,
         session: &impl TlsSession,
     ) -> Result<(), crate::transport::Error> {
-        if let Some(context) = self.exporter_handler.on_tls_exporter_ready(session) {
-            match self.send_to_quic.push(Request::TlsContext(context)) {
+        if let Some(result) = self.exporter_handler.on_tls_exporter_ready(session) {
+            match self.send_to_quic.push(Request::TlsContext(result)) {
                 Ok(_) => (),
                 Err(_) => self.error = Some(SLICE_ERROR),
             }
@@ -598,7 +634,6 @@ enum Request<S: CryptoSuite> {
     ),
     ServerName(crate::application::ServerName),
     SendInitial(bytes::Bytes),
-    ClientParams(Vec<u8>, Vec<u8>),
     HandshakeKeys(
         <S as CryptoSuite>::HandshakeKey,
         <S as CryptoSuite>::HandshakeHeaderKey,
@@ -630,7 +665,6 @@ impl<S: CryptoSuite> alloc::fmt::Debug for Request<S> {
         match self {
             Request::ServerName(_) => write!(f, "ServerName"),
             Request::SendInitial(_) => write!(f, "SendInitial"),
-            Request::ClientParams(_, _) => write!(f, "ClientParams"),
             Request::HandshakeKeys(_, _) => write!(f, "HandshakeKeys"),
             Request::SendHandshake(_) => write!(f, "SendHandshake"),
             Request::ApplicationProtocol(_) => write!(f, "ApplicationProtocol"),

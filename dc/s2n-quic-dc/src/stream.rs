@@ -25,10 +25,25 @@ pub mod send;
 pub mod server;
 pub mod shared;
 pub mod socket;
+pub(crate) mod tls;
+
+pub use tls::{CertificateChain, Conn as TlsConnection, ConnectionBuilder as TlsConnectionBuilder};
 
 #[cfg(any(test, feature = "testing"))]
+#[allow(
+    clippy::unwrap_used,
+    clippy::unwrap_in_result,
+    clippy::panic,
+    clippy::panic_in_result_fn,
+    reason = "test-support helpers may panic to surface setup failures"
+)]
 pub mod testing;
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_in_result,
+    clippy::panic_in_result_fn,
+    reason = "test code may panic to surface failures"
+)]
 mod tests;
 
 bitflags::bitflags! {

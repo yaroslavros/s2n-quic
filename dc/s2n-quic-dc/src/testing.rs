@@ -6,7 +6,7 @@ use crate::{
     path::secret::{stateless_reset::Signer, Map},
     psk::{client, server},
 };
-use s2n_quic::{provider::tls::Provider, server::Name, Connection};
+use s2n_quic::{provider::tls::Provider, server::Name};
 use s2n_quic_core::{crypto::tls::testing::certificates, time::StdClock};
 use std::{sync::OnceLock, time::Duration};
 
@@ -163,8 +163,6 @@ pub fn sim(f: impl FnOnce()) {
     rt.run(f);
 }
 
-pub(crate) fn query_event(_connection: &mut Connection, _limiter_duration: Duration) {}
-
 #[derive(Clone, Default)]
 pub struct NoopSubscriber;
 
@@ -204,6 +202,8 @@ impl Provider for TestTlsProvider {
         let server = s2n_quic_tls_prov::Server::builder()
             .with_application_protocols(["h3"].iter())?
             .with_certificate(certificates::CERT_PEM, certificates::KEY_PEM)?
+            .with_client_authentication()?
+            .with_trusted_certificate(certificates::CERT_PEM)?
             .build()?;
         Ok(server)
     }
@@ -212,6 +212,37 @@ impl Provider for TestTlsProvider {
         let client = s2n_quic_tls_prov::Client::builder()
             .with_application_protocols(["h3"].iter())?
             .with_certificate(certificates::CERT_PEM)?
+            .with_client_identity(certificates::CERT_PEM, certificates::KEY_PEM)?
+            .build()?;
+        Ok(client)
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct UntrustedClientProvider;
+
+impl Provider for UntrustedClientProvider {
+    type Server = s2n_quic_tls_prov::Server;
+    type Client = s2n_quic_tls_prov::Client;
+    type Error = Box<dyn std::error::Error + Send + Sync>;
+
+    fn start_server(self) -> Result<Self::Server, Self::Error> {
+        let server = s2n_quic_tls_prov::Server::builder()
+            .with_application_protocols(["h3"].iter())?
+            .with_certificate(certificates::CERT_PEM, certificates::KEY_PEM)?
+            .with_client_authentication()?
+            .build()?;
+        Ok(server)
+    }
+
+    fn start_client(self) -> Result<Self::Client, Self::Error> {
+        let client = s2n_quic_tls_prov::Client::builder()
+            .with_application_protocols(["h3"].iter())?
+            .with_certificate(certificates::CERT_PEM)?
+            .with_client_identity(
+                certificates::UNTRUSTED_CERT_PEM,
+                certificates::UNTRUSTED_KEY_PEM,
+            )?
             .build()?;
         Ok(client)
     }
@@ -267,6 +298,7 @@ impl Pair {
                 Map::new(
                     Signer::new(b"default"),
                     50_000,
+                    false,
                     StdClock::default(),
                     test_event_subscriber.clone(),
                 ),
@@ -281,12 +313,12 @@ impl Pair {
                 Map::new(
                     Signer::new(b"default"),
                     50_000,
+                    false,
                     StdClock::default(),
                     test_event_subscriber.clone(),
                 ),
                 tls_materials_provider,
                 test_event_subscriber,
-                query_event,
                 server_name(),
             )
             .unwrap();
@@ -309,6 +341,7 @@ impl Pair {
                 Map::new(
                     Signer::new(b"default"),
                     50_000,
+                    false,
                     StdClock::default(),
                     test_event_subscriber.clone(),
                 ),
@@ -322,12 +355,12 @@ impl Pair {
                 Map::new(
                     Signer::new(b"default"),
                     50_000,
+                    false,
                     StdClock::default(),
                     test_event_subscriber.clone(),
                 ),
                 tls_materials_provider,
                 test_event_subscriber,
-                query_event,
                 server_name(),
             )
             .unwrap();

@@ -5,9 +5,11 @@ use crate::{
     path::secret,
     psk::io::{
         Result, DEFAULT_IDLE_TIMEOUT, DEFAULT_MAX_DATA, DEFAULT_MTU, DEFAULT_PTO_JITTER_PERCENTAGE,
+        DEFAULT_THREAD_COUNT,
     },
 };
 use s2n_quic::provider::{event::Subscriber as Sub, tls::Provider as Prov};
+use s2n_quic_dc_metrics::Registry;
 use std::{net::SocketAddr, time::Duration};
 
 use super::Provider;
@@ -15,13 +17,32 @@ use super::Provider;
 pub struct Builder<
     Event: s2n_quic::provider::event::Subscriber = s2n_quic::provider::event::default::Subscriber,
 > {
-    #[allow(dead_code)]
     pub(crate) event_subscriber: Event,
     pub(crate) data_window: u64,
     pub(crate) initial_data_window: Option<u64>,
     pub(crate) mtu: u16,
     pub(crate) max_idle_timeout: Duration,
     pub(crate) pto_jitter_percentage: u8,
+    #[cfg(any(test, feature = "testing"))]
+    pub(crate) endpoint_limits: Option<TestEndpointLimiter>,
+    pub(crate) thread_offload_count: usize,
+    pub(crate) registry: Option<Registry>,
+}
+
+/// A wrapper type for test endpoint limiters
+#[cfg(any(test, feature = "testing"))]
+pub struct TestEndpointLimiter(
+    pub Box<dyn s2n_quic::provider::endpoint_limits::Limiter + Send + Sync>,
+);
+
+#[cfg(any(test, feature = "testing"))]
+impl s2n_quic::provider::endpoint_limits::Limiter for TestEndpointLimiter {
+    fn on_connection_attempt(
+        &mut self,
+        info: &s2n_quic::provider::endpoint_limits::ConnectionAttempt,
+    ) -> s2n_quic::provider::endpoint_limits::Outcome {
+        self.0.on_connection_attempt(info)
+    }
 }
 
 impl Default for Builder<s2n_quic::provider::event::default::Subscriber> {
@@ -33,6 +54,10 @@ impl Default for Builder<s2n_quic::provider::event::default::Subscriber> {
             mtu: DEFAULT_MTU,
             max_idle_timeout: DEFAULT_IDLE_TIMEOUT,
             pto_jitter_percentage: DEFAULT_PTO_JITTER_PERCENTAGE,
+            #[cfg(any(test, feature = "testing"))]
+            endpoint_limits: None,
+            thread_offload_count: DEFAULT_THREAD_COUNT,
+            registry: None,
         }
     }
 }
@@ -50,7 +75,23 @@ impl<Event: s2n_quic::provider::event::Subscriber> Builder<Event> {
             mtu: self.mtu,
             max_idle_timeout: self.max_idle_timeout,
             pto_jitter_percentage: self.pto_jitter_percentage,
+            #[cfg(any(test, feature = "testing"))]
+            endpoint_limits: self.endpoint_limits,
+            thread_offload_count: self.thread_offload_count,
+            registry: self.registry,
         }
+    }
+
+    /// Sets endpoint limits for testing purposes only
+    #[cfg(any(test, feature = "testing"))]
+    pub fn with_endpoint_limits<
+        L: s2n_quic::provider::endpoint_limits::Limiter + Send + Sync + 'static,
+    >(
+        mut self,
+        limiter: L,
+    ) -> Self {
+        self.endpoint_limits = Some(TestEndpointLimiter(Box::new(limiter)));
+        self
     }
 
     /// Sets the data window to use for flow control
@@ -98,6 +139,23 @@ impl<Event: s2n_quic::provider::event::Subscriber> Builder<Event> {
         self
     }
 
+    /// Controls the number of extra threads used to process incoming TLS handshakes
+    ///
+    /// dc-quic can offload the TLS handshake work to separate threads outside of the main event loop
+    /// in order to avoid blocking the event loop. Increase the thread count for better TPS
+    /// in the case of many clients trying to handshake with the server.
+    /// - 0: Offloading not enabled
+    /// - 1+: One extra thread performing offload from primary event loop
+    pub fn with_thread_count(mut self, count: usize) -> Self {
+        self.thread_offload_count = count;
+        self
+    }
+
+    pub fn with_registry(mut self, registry: Registry) -> Self {
+        self.registry = Some(registry);
+        self
+    }
+
     /// Starts the server listening to the given address.
     pub async fn start<
         TlsProvider: Prov + Send + Sync + 'static,
@@ -115,7 +173,7 @@ impl<Event: s2n_quic::provider::event::Subscriber> Builder<Event> {
             tls_materials_provider,
             subscriber,
             self,
-        );
+        )?;
         let local_addr = rx.await??;
         Ok(Provider::new(map, local_addr, guard))
     }
@@ -137,7 +195,7 @@ impl<Event: s2n_quic::provider::event::Subscriber> Builder<Event> {
             tls_materials_provider,
             subscriber,
             self,
-        );
+        )?;
         let local_addr = rx.blocking_recv()??;
         Ok(Provider::new(map, local_addr, guard))
     }

@@ -3,9 +3,9 @@
 
 use crate::{
     crypto::tls::TlsSession,
-    dc,
-    dc::{ApplicationParams, ConnectionInfo, DatagramInfo},
-    stateless_reset, transport,
+    dc::{self, ApplicationParams, ConnectionInfo, DatagramInfo},
+    stateless_reset,
+    transport::{self, parameters::MtuProbingCompleteSupport},
     varint::VarInt,
 };
 use core::{num::NonZeroU32, time::Duration};
@@ -18,6 +18,8 @@ pub struct MockDcEndpoint {
     stateless_reset_tokens: Vec<stateless_reset::Token>,
     pub on_possible_secret_control_packet_count: Arc<AtomicU8>,
     pub on_possible_secret_control_packet: fn() -> bool,
+    mtu_probing_complete_support: MtuProbingCompleteSupport,
+    fail_path_secrets: bool,
 }
 
 impl MockDcEndpoint {
@@ -26,7 +28,22 @@ impl MockDcEndpoint {
             stateless_reset_tokens: tokens.to_vec(),
             on_possible_secret_control_packet_count: Arc::new(AtomicU8::default()),
             on_possible_secret_control_packet: || false,
+            mtu_probing_complete_support: MtuProbingCompleteSupport::Enabled,
+            fail_path_secrets: false,
         }
+    }
+
+    pub fn with_mtu_probing_complete_support(mut self, mtu_probing_complete_support: bool) -> Self {
+        self.mtu_probing_complete_support = match mtu_probing_complete_support {
+            true => MtuProbingCompleteSupport::Enabled,
+            false => MtuProbingCompleteSupport::Disabled,
+        };
+        self
+    }
+
+    pub fn with_failing_path_secrets(mut self) -> Self {
+        self.fail_path_secrets = true;
+        self
     }
 }
 
@@ -38,6 +55,7 @@ pub struct MockDcPath {
     pub stateless_reset_tokens: Vec<stateless_reset::Token>,
     pub peer_stateless_reset_tokens: Vec<stateless_reset::Token>,
     pub mtu: u16,
+    pub fail_path_secrets: bool,
 }
 
 impl dc::Endpoint for MockDcEndpoint {
@@ -46,6 +64,7 @@ impl dc::Endpoint for MockDcEndpoint {
     fn new_path(&mut self, connection_info: &ConnectionInfo) -> Option<Self::Path> {
         Some(MockDcPath {
             stateless_reset_tokens: self.stateless_reset_tokens.clone(),
+            fail_path_secrets: self.fail_path_secrets,
             mtu: connection_info
                 .application_params
                 .max_datagram_size
@@ -63,6 +82,13 @@ impl dc::Endpoint for MockDcEndpoint {
             .fetch_add(1, Ordering::Relaxed);
         (self.on_possible_secret_control_packet)()
     }
+
+    fn mtu_probing_complete_support(&self) -> bool {
+        matches!(
+            self.mtu_probing_complete_support,
+            MtuProbingCompleteSupport::Enabled
+        )
+    }
 }
 
 impl dc::Path for MockDcPath {
@@ -71,6 +97,9 @@ impl dc::Path for MockDcPath {
         _session: &impl TlsSession,
     ) -> Result<Vec<stateless_reset::Token>, transport::Error> {
         debug_assert_eq!(0, self.on_path_secrets_ready_count);
+        if self.fail_path_secrets {
+            return Err(transport::Error::application_error(VarInt::new(0)?));
+        }
         self.on_path_secrets_ready_count += 1;
         Ok(self.stateless_reset_tokens.clone())
     }
@@ -92,6 +121,15 @@ impl dc::Path for MockDcPath {
 
     fn on_mtu_updated(&mut self, mtu: u16) {
         self.mtu = mtu
+    }
+
+    fn on_secret(
+        &mut self,
+        _secret: Box<dyn std::any::Any + Send + 'static>,
+    ) -> Result<Vec<stateless_reset::Token>, transport::Error> {
+        debug_assert_eq!(0, self.on_path_secrets_ready_count);
+        self.on_path_secrets_ready_count += 1;
+        Ok(self.stateless_reset_tokens.clone())
     }
 }
 
